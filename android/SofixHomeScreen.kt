@@ -73,6 +73,9 @@ fun SofixHomeScreen(
     autoConnectOnBoot: Boolean,
     onAutoConnectOnBoot: (Boolean) -> Unit,
     onSystemVpnSettings: () -> Unit,
+    networkState: String,
+    subscriptionLabel: String,
+    onDiagnostics: () -> Unit,
 ) {
     val accent by animateColorAsState(
         targetValue = if (!hasEntitlement) Color(0xFFFF666E) else if (connected) mint else Color(0xFF799DA1),
@@ -179,7 +182,7 @@ fun SofixHomeScreen(
             Box(Modifier.size(7.dp).background(if (connected) mint else Color(0xFF8BABB1), CircleShape))
             Spacer(Modifier.width(9.dp))
             Text(
-                if (!hasEntitlement) "НЕТ ПОДПИСКИ" else if (connected && isTrial) "ПРОБНЫЙ VPN · ${trialMinutes} МИН" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
+                if (!hasEntitlement) "НЕТ ПОДПИСКИ" else if (connected && networkState=="WAITING_NETWORK") "ОЖИДАЕМ ИНТЕРНЕТ" else if (connected && networkState=="DEGRADED") "СОЕДИНЕНИЕ НЕ ПОДТВЕРЖДЕНО" else if (connected && networkState!="CONNECTED") "ПРОВЕРЯЕМ СОЕДИНЕНИЕ" else if (connected && isTrial) "ПРОБНЫЙ VPN · ${trialMinutes} МИН" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
                 fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold,
                 color = if (!hasEntitlement) Color(0xFFFF888E) else if (connected) mint else Color(0xFFB7CCD0)
             )
@@ -188,10 +191,20 @@ fun SofixHomeScreen(
         Text(
             if (!hasEntitlement) "15 минут бесплатного VPN перед оформлением" else
                 if (isTrial && connected) "Соединение активно. Проверяем доступность Telegram" else
+                if (connected && networkState=="WAITING_NETWORK") "VPN ждёт восстановления Wi-Fi" else
+                if (connected && networkState!="CONNECTED") "Проверяем доступность сети через SOFIX" else
                 if (connected) "Ваш интернет защищён" else "Нажмите кнопку, чтобы включить защиту",
             color = muted, fontSize = 13.sp, textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(29.dp))
+        Spacer(Modifier.height(11.dp))
+        Box(Modifier.fillMaxWidth()
+            .border(1.dp,outline,RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(13.dp))
+            .clickable { onAccount("account") }
+            .padding(14.dp),contentAlignment=Alignment.Center) {
+            Text(subscriptionLabel,color=mint,fontSize=13.sp)
+        }
+        Spacer(Modifier.height(18.dp))
         Column(
             Modifier.fillMaxWidth()
                 .border(1.dp, outline, RoundedCornerShape(21.dp))
@@ -252,7 +265,7 @@ fun SofixHomeScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text("ПРОВЕРИТЬ СОЕДИНЕНИЕ", modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .clickable(enabled = connected) { onTest() }
+                .clickable { onDiagnostics() }
                 .padding(8.dp),
                 color = if (connected) mint else muted, fontWeight = FontWeight.Bold,
                 fontSize = 10.sp, letterSpacing = 1.3.sp)

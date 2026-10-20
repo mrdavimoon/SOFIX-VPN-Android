@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 757')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.7.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 758')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.8.0-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -31,7 +31,10 @@ s = s.replace('    <uses-permission android:name="android.permission.INTERNET" /
 anchor = '        <activity\n            android:name=".ui.main.MainActivity"'
 assert s.count(anchor) == 1
 
-s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixSimpleSettingsActivity" android:exported="false" />\n'
+s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixRoutingActivity" android:exported="false" />\n'
+                      + '        <activity android:name=".ui.sofix.SofixDiagnosticsActivity" android:exported="false" />\n'
+                      + '        <activity android:name=".ui.sofix.SofixDemoActivity" android:exported="false" />\n'
+                      + '        <activity android:name=".ui.sofix.SofixSimpleSettingsActivity" android:exported="false" />\n'
                       + '        <activity android:name=".ui.sofix.SofixUpdateActivity" android:exported="false" />\n' + anchor)
 anchor = '            <meta-data\n                android:name="android.app.shortcuts"'
 assert s.count(anchor) == 1
@@ -64,6 +67,10 @@ import com.v2ray.ang.ui.sofix.SofixHomeScreen
 import com.v2ray.ang.ui.sofix.SofixUpdateActivity
 import com.v2ray.ang.ui.sofix.SofixSimpleSettingsActivity
 import com.v2ray.ang.ui.sofix.SofixTrialManager
+import com.v2ray.ang.ui.sofix.SofixHealth
+import com.v2ray.ang.ui.sofix.SofixSubscription
+import com.v2ray.ang.ui.sofix.SofixDiagnosticsActivity
+import com.v2ray.ang.ui.sofix.SofixRuleUpdates
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
@@ -78,7 +85,7 @@ import android.provider.Settings
 """)
 anchor = '        mainViewModel.onAction(MainAction.Initialize)'
 assert s.count(anchor) == 1
-s = s.replace(anchor, anchor + "\n        startTrialPolling()\n        bootEnabled = MmkvManager.decodeStartOnBoot()")
+s = s.replace(anchor, anchor + "\n        startTrialPolling()\n        startHealthPolling()\n        bootEnabled = MmkvManager.decodeStartOnBoot()")
 
 start = s.index('    @Composable\n    override fun ScreenContent() {')
 end = s.index('    private fun shareToClipboard(', start)
@@ -115,6 +122,9 @@ screen = """    @Composable
                 MmkvManager.encodeStartOnBoot(enabled)
                 bootEnabled = enabled
             },
+            networkState = connectionStatus,
+            subscriptionLabel = subscriptionLabel,
+            onDiagnostics = { startActivity(Intent(this, SofixDiagnosticsActivity::class.java)) },
             onSystemVpnSettings = {
                 try { startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
                 catch (_:Exception) { trialHint="Настройки VPN находятся в системных настройках Android." }
@@ -184,6 +194,12 @@ boot_receiver.write_text(boot_source)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
-for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixUpdateScreen.kt", "SofixSimpleSettingsActivity.kt", "SofixTrialManager.kt"):
+for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixUpdateScreen.kt", "SofixSimpleSettingsActivity.kt", "SofixTrialManager.kt", "SofixRouting.kt", "SofixRuleUpdates.kt", "SofixRoutingActivity.kt", "SofixDiagnosticsActivity.kt", "SofixSubscription.kt", "SofixDemoActivity.kt"):
     shutil.copy2(overlay / name, dest / name)
-print("SOFIX 0.7 modern updater, simple native settings and boot VPN")
+core=app / "src/main/java/com/v2ray/ang/core/CoreConfigManager.kt"
+core_source=core.read_text()
+anchor="        configureRootModeDns(v2rayConfig)\n"
+assert core_source.count(anchor)==1
+core_source=core_source.replace(anchor,anchor+"        com.v2ray.ang.ui.sofix.SofixRouting.apply(configContext.context,v2rayConfig)\n")
+core.write_text(core_source)
+print("SOFIX 0.8 routing, diagnostics, account status and onboarding demo")

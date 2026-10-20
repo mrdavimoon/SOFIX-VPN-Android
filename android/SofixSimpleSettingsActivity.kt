@@ -42,6 +42,7 @@ class SofixSimpleSettingsActivity: ComponentActivity() {
     private var autostart by mutableStateOf(false)
     private var advanced by mutableStateOf(false)
     private var explanation by mutableStateOf("")
+    private var versionTaps=0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +70,14 @@ class SofixSimpleSettingsActivity: ComponentActivity() {
                     catch(e:Exception) {explanation="Откройте Настройки Android → VPN → SOFIX VPN."}
                 },
                 onUpdate={startActivity(Intent(this,SofixUpdateActivity::class.java))},
+                onRouting={startActivity(Intent(this,SofixRoutingActivity::class.java))},
+                onVersionTap={
+                    versionTaps++
+                    if(versionTaps>=7){
+                        versionTaps=0
+                        startActivity(Intent(this,SofixDemoActivity::class.java))
+                    }
+                },
                 onExpert={startActivity(Intent(this,SettingsActivity::class.java))}
             )
         }
@@ -130,6 +139,8 @@ private fun SimpleSettingsScreen(
     onAdvanced:(Boolean)->Unit,
     onAndroidVpn:()->Unit,
     onUpdate:()->Unit,
+    onRouting:()->Unit,
+    onVersionTap:()->Unit,
     onExpert:()->Unit
 ) {
     Column(Modifier.fillMaxSize().background(
@@ -154,6 +165,10 @@ private fun SimpleSettingsScreen(
         SettingRow("Включать VPN после перезагрузки",
             "SOFIX автоматически восстановит соединение после запуска телефона.",
             checked=boot,onToggle=onBoot)
+        Spacer(Modifier.height(11.dp))
+        SettingRow("Раздельное туннелирование",
+            "Автоматически открывать российские сайты напрямую, остальные через VPN.",
+            onClick=onRouting)
         Spacer(Modifier.height(11.dp))
         SettingRow("Постоянная VPN",
             "Дополнительная защита Android: телефон может сам поддерживать VPN-подключение.",
@@ -184,7 +199,8 @@ private fun SimpleSettingsScreen(
         }
         Spacer(Modifier.height(23.dp))
         Text("SOFIX VPN · "+BuildConfig.VERSION_NAME,
-            color=soft,fontSize=11.sp)
+            color=soft,fontSize=11.sp,
+            modifier=Modifier.clickable { onVersionTap() })
         Spacer(Modifier.height(32.dp))
     }
 }

@@ -1,0 +1,4 @@
+{
+  "payload": "{\"blocked_domains\":[\"discord.com\",\"facebook.com\",\"instagram.com\",\"twitter.com\",\"youtube.com\"],\"expires_at\":1808063155,\"format\":1,\"generated_at\":1792511155,\"ru_domains\":[\"gosuslugi.ru\",\"vk.com\",\"yandex.ru\"],\"version\":1}",
+  "signature": "l3tczNJypG7K3Ks2Eun0PlQV0fXtMXkTmjEdq7euzXMHooADuD2GLMl0rmocZ9CGcZ3UfgXiDu29Cwq7fcMTCA=="
+}

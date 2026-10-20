@@ -1,3 +1,35 @@
+    private var connectionStatus by mutableStateOf("OFF")
+    private var subscriptionLabel by mutableStateOf("Проверяем подписку…")
+    private fun startHealthPolling() {
+        subscriptionLabel=SofixSubscription.cached(this)
+        lifecycleScope.launch {
+            var count=0
+            while (!isFinishing) {
+                val running=mainViewModel.uiState.value.isRunning
+                val quick=SofixHealth.fast(this@MainActivity,running)
+                if(quick!="CHECKING" || connectionStatus=="OFF")connectionStatus=quick
+                if (running && SofixHealth.physicalAvailable(this@MainActivity) && count%3==0) {
+                    val sampled=withContext(Dispatchers.IO){SofixHealth.sample(this@MainActivity,true)}
+                    connectionStatus=sampled.name
+                }
+                if(count%3==0) {
+                    subscriptionLabel=try {withContext(Dispatchers.IO){
+                        SofixSubscription.fetch(this@MainActivity)
+                    }}catch (_:Exception){
+                        SofixSubscription.cached(this@MainActivity)+" · последняя проверка"
+                    }
+                }
+                if(count%180==0) {
+                    withContext(Dispatchers.IO){
+                        try {SofixRuleUpdates.refresh(this@MainActivity)}catch (_:Exception){}
+                    }
+                }
+                count++
+                delay(20_000)
+            }
+        }
+    }
+
     private var offerTrial by mutableStateOf(false)
     private var trialMinutesLeft by mutableIntStateOf(0)
     private var trialBusy by mutableStateOf(false)
