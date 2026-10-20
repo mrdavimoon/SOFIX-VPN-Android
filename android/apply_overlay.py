@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 754')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.4.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 755')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.5.0-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -30,7 +30,7 @@ s = s.replace('    <uses-permission android:name="android.permission.INTERNET" /
               '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />')
 anchor = '        <activity\n            android:name=".ui.main.MainActivity"'
 assert s.count(anchor) == 1
-s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixPairActivity" android:exported="false" />\n' + anchor)
+
 s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixUpdateActivity" android:exported="false" />\n' + anchor)
 anchor = '            <meta-data\n                android:name="android.app.shortcuts"'
 assert s.count(anchor) == 1
@@ -58,21 +58,24 @@ main = app / "src/main/java/com/v2ray/ang/ui/main/MainActivity.kt"
 s = main.read_text()
 anchor = 'import com.v2ray.ang.AngApplication\n'
 assert s.count(anchor) == 1
-s = s.replace(anchor, anchor + """import com.v2ray.ang.ui.sofix.SofixPairActivity
+s = s.replace(anchor, anchor + """import com.v2ray.ang.ui.sofix.SofixLegacyPair
 import com.v2ray.ang.ui.sofix.SofixHomeScreen
 import com.v2ray.ang.ui.sofix.SofixUpdateActivity
+import com.v2ray.ang.ui.sofix.SofixTrialManager
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 """)
 anchor = '        mainViewModel.onAction(MainAction.Initialize)'
 assert s.count(anchor) == 1
-s = s.replace(anchor, """        if (!SofixPairActivity.paired(this)) {
-            startActivity(Intent(this, SofixPairActivity::class.java))
-            finish()
-            return
-        }
-""" + anchor)
+s = s.replace(anchor, anchor + "\n        startTrialPolling()")
 
 start = s.index('    @Composable\n    override fun ScreenContent() {')
 end = s.index('    private fun shareToClipboard(', start)
@@ -84,13 +87,45 @@ screen = """    @Composable
             connected = state.isRunning,
             configured = !state.selectedGuid.isNullOrBlank(),
             status = mainViewModel.formatStatus(state.status),
-            onPower = { handleFabAction() },
-            onAccount = { section -> openSofixMiniApp(section) },
+            onPower = {
+                if (!SofixLegacyPair.paired(this) && !trialPaid && trialMinutesLeft <= 0) showSubscriptionOffer()
+                else handleFabAction()
+            },
+            onAccount = { section ->
+                if (!SofixLegacyPair.paired(this) && !trialLinked && !trialPaid)
+                    showSubscriptionOffer()
+                else openSofixMiniApp(section)
+            },
             onRefresh = { mainViewModel.onAction(MainAction.UpdateSubscriptions) },
             onTest = { handleLayoutTestClick() },
             onVpnSettings = { navigateTo(MainDestination.Settings) },
             onUpdates = { startActivity(Intent(this, SofixUpdateActivity::class.java)) },
+            hasEntitlement = SofixLegacyPair.paired(this) || trialPaid || trialMinutesLeft > 0,
+            isTrial = !trialPaid && !SofixLegacyPair.paired(this) && trialMinutesLeft > 0,
+            trialMinutes = trialMinutesLeft,
+            linked = trialLinked,
+            onboardingMessage = trialHint,
+            onSubscribe = { showSubscriptionOffer() },
+            onLink = { verifyAndLinkTelegram() },
         )
+        if(offerTrial) {
+            AlertDialog(
+                onDismissRequest = { offerTrial = false },
+                title = { Text("Попробуйте SOFIX VPN") },
+                text = { Text("Сначала включим бесплатный VPN на 15 минут. Telegram пока не нужен. После проверки интернета сможете привязать аккаунт без кода.") },
+                confirmButton = {
+                    TextButton(onClick = { beginFreeTrial() }) {
+                        Text("Включить на 15 минут")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        offerTrial=false
+                        openSofixMiniApp("account")
+                    }) { Text("Перейти без пробного доступа") }
+                },
+            )
+        }
     }
 
 """
@@ -106,11 +141,12 @@ miniapp = """    private fun openSofixMiniApp(section: String) {
     }
 
 """
-s = s[:start] + screen + miniapp + s[end:]
+trial = (overlay / "SofixTrialMain.kt.txt").read_text()
+s = s[:start] + screen + miniapp + trial + s[end:]
 main.write_text(s)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
-for name in ("SofixPairActivity.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt"):
+for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixTrialManager.kt"):
     shutil.copy2(overlay / name, dest / name)
-print("SOFIX 0.4 native UI, verified updater, VPN controls installed")
+print("SOFIX 0.5 trial-first VPN onboarding without Telegram prerequisite")

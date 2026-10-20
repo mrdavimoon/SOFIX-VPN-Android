@@ -61,13 +61,20 @@ fun SofixHomeScreen(
     onTest: () -> Unit,
     onVpnSettings: () -> Unit,
     onUpdates: () -> Unit,
+    hasEntitlement: Boolean,
+    isTrial: Boolean,
+    trialMinutes: Int,
+    linked: Boolean,
+    onboardingMessage: String,
+    onSubscribe: () -> Unit,
+    onLink: () -> Unit,
 ) {
     val accent by animateColorAsState(
-        targetValue = if (connected) mint else Color(0xFF799DA1),
+        targetValue = if (!hasEntitlement) Color(0xFFFF666E) else if (connected) mint else Color(0xFF799DA1),
         animationSpec = tween(380), label = "vpn-accent"
     )
     val glow by animateFloatAsState(
-        targetValue = if (connected) 1f else .42f,
+        targetValue = if (connected || !hasEntitlement) 1f else .42f,
         animationSpec = tween(500), label = "vpn-glow"
     )
     Column(
@@ -157,7 +164,7 @@ fun SofixHomeScreen(
                         )
                     }
                     Spacer(Modifier.height(13.dp))
-                    Text(if (connected) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
+                    Text(if (!hasEntitlement) "НЕТ ПОДПИСКИ" else if (connected) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
                         fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.6.sp, color = white)
                 }
             }
@@ -167,14 +174,15 @@ fun SofixHomeScreen(
             Box(Modifier.size(7.dp).background(if (connected) mint else Color(0xFF8BABB1), CircleShape))
             Spacer(Modifier.width(9.dp))
             Text(
-                if (!configured) "НЕТ СЕРВЕРА" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
+                if (!hasEntitlement) "НЕТ ПОДПИСКИ" else if (connected && isTrial) "ПРОБНЫЙ VPN · ${trialMinutes} МИН" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
                 fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold,
-                color = if (connected) mint else Color(0xFFB7CCD0)
+                color = if (!hasEntitlement) Color(0xFFFF888E) else if (connected) mint else Color(0xFFB7CCD0)
             )
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            if (!configured) "Обновите подписку или откройте кабинет" else
+            if (!hasEntitlement) "15 минут бесплатного VPN перед оформлением" else
+                if (isTrial && connected) "Соединение активно. Проверяем доступность Telegram" else
                 if (connected) "Ваш интернет защищён" else "Нажмите кнопку, чтобы включить защиту",
             color = muted, fontSize = 13.sp, textAlign = TextAlign.Center
         )
@@ -195,13 +203,33 @@ fun SofixHomeScreen(
                 Column(Modifier.weight(1f)) {
                     Text("SOFIX · Основной сервер", color = white, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(Modifier.height(3.dp))
-                    Text(if (configured) "Подписка загружена" else "Ожидается конфигурация",
+                    Text(if (!hasEntitlement) "Нет подписки" else if (isTrial) "15 минут временного доступа" else "Подписка загружена",
                         color = muted, fontSize = 11.sp)
                 }
                 Text("↻", color = mint, fontSize = 23.sp)
             }
             Spacer(Modifier.height(12.dp))
             Text("Нажмите, чтобы обновить подключение", color = muted, fontSize = 11.sp)
+        }
+        if(!hasEntitlement || isTrial){
+            Spacer(Modifier.height(15.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
+                 .background(Brush.horizontalGradient(listOf(Color(0xFFB4F7D9),Color(0xFF6FD4BC))))
+                 .clickable { onSubscribe() }
+                 .padding(19.dp),contentAlignment = Alignment.Center){
+                 Text("ОФОРМИТЬ ПОДПИСКУ  →", color=Color(0xFF0B3329),fontSize=14.sp,fontWeight=FontWeight.ExtraBold)
+            }
+        }
+        if(onboardingMessage.isNotBlank()){
+            Spacer(Modifier.height(12.dp))
+            Text(onboardingMessage, color=muted,fontSize=12.sp,textAlign=TextAlign.Center)
+            if(isTrial && !linked && connected){
+                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .border(1.dp,outline,RoundedCornerShape(12.dp)).clickable { onLink() }
+                    .padding(13.dp),contentAlignment=Alignment.Center){
+                    Text("Проверить доступность Telegram ↗",color=mint,fontSize=12.sp)
+                }
+            }
         }
         Spacer(Modifier.height(13.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(11.dp)) {

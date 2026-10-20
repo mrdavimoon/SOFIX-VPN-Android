@@ -1,0 +1,131 @@
+    private var offerTrial by mutableStateOf(false)
+    private var trialMinutesLeft by mutableIntStateOf(0)
+    private var trialBusy by mutableStateOf(false)
+    private var trialHint by mutableStateOf("")
+    private var trialLinked by mutableStateOf(false)
+    private var trialPaid by mutableStateOf(false)
+    private var trialTelegramOpened = false
+    private var linkCheckBusy = false
+
+    private fun updateTrialClock() {
+        trialMinutesLeft = ((SofixTrialManager.expiresAt(this) - System.currentTimeMillis()/1000 + 59) / 60)
+            .toInt().coerceAtLeast(0)
+    }
+
+    private fun startTrialPolling() {
+        trialLinked = SofixTrialManager.linked(this)
+        trialPaid = SofixTrialManager.paid(this)
+        updateTrialClock()
+        lifecycleScope.launch {
+            while (!isFinishing) {
+                updateTrialClock()
+                delay(10_000)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateTrialClock()
+        if (SofixTrialManager.token(this)!=null) refreshTrialServerState()
+    }
+
+    private fun refreshTrialServerState() {
+        lifecycleScope.launch {
+            val result=try {
+                withContext(Dispatchers.IO){SofixTrialManager.status(this@MainActivity)}
+            }catch (_:Exception){null}
+            if (result==null) return@launch
+            val linked=result.optBoolean("linked",false)
+            if (linked){
+                SofixTrialManager.markLinked(this@MainActivity)
+                trialLinked=true
+                if(result.optString("state")=="ready"){
+                    val paidUrl=result.optString("subscription_url")
+                    if(paidUrl.startsWith("https://") && !trialPaid){
+                        withContext(Dispatchers.IO){AngConfigManager.importBatchConfig(paidUrl,"",false)}
+                        SofixTrialManager.markPaid(this@MainActivity)
+                        trialPaid=true
+                        mainViewModel.onAction(MainAction.RefreshGroups)
+                    }
+                }else trialHint="Телефон привязан к Telegram. Оформите подписку в Mini App."
+            }
+        }
+    }
+
+    private fun showSubscriptionOffer() {
+        if (trialPaid || SofixLegacyPair.paired(this)) {
+            openSofixMiniApp("renew")
+        } else if (SofixTrialManager.token(this)!=null) {
+            if (!trialLinked) verifyAndLinkTelegram()
+            else openSofixMiniApp("renew")
+        } else offerTrial=true
+    }
+
+    private fun beginFreeTrial() {
+        offerTrial=false
+        if (trialBusy) return
+        trialBusy=true
+        trialHint="Получаем 15 минут бесплатного VPN…"
+        lifecycleScope.launch {
+            try{
+                val payload=withContext(Dispatchers.IO){ SofixTrialManager.start(this@MainActivity) }
+                updateTrialClock()
+                trialHint="Загружаем VPN-конфигурацию…"
+                val imported=withContext(Dispatchers.IO){
+                    AngConfigManager.importBatchConfig(payload.getString("subscription_url"),"",false)
+                }
+                if(imported.first+imported.second < 1)
+                    throw IllegalStateException("Не удалось загрузить VPN-конфигурацию")
+                mainViewModel.onAction(MainAction.RefreshGroups)
+                trialHint="Настраиваем VPN…"
+                var ready=false
+                for(i in 0 until 25){
+                    if(mainViewModel.uiState.value.selectedGuid.isNullOrBlank()) delay(400)
+                    else {ready=true;break}
+                }
+                if(!ready && mainViewModel.uiState.value.selectedGuid.isNullOrBlank())
+                    throw IllegalStateException("Не удалось выбрать VPN-сервер")
+                requestServiceStart()
+                trialHint="Разрешите VPN-подключение в Android. Затем проверим доступ в интернет."
+                verifyAndLinkTelegram()
+            }catch(e:Exception){
+                trialHint="Не удалось включить пробный VPN: "+(e.message?:"Проверьте интернет")
+            }finally{trialBusy=false}
+        }
+    }
+
+    private fun verifyAndLinkTelegram() {
+        if(linkCheckBusy || trialLinked) {
+            if(trialLinked)openSofixMiniApp("renew")
+            return
+        }
+        linkCheckBusy=true
+        lifecycleScope.launch {
+            try{
+                trialHint="Проверяем VPN и доступность Telegram…"
+                var connected=false
+                for(i in 0 until 24){
+                    if(mainViewModel.uiState.value.isRunning){connected=true;break}
+                    delay(1000)
+                }
+                if(!connected) {
+                    trialHint="VPN ещё не подключён. Включите его большой кнопкой и повторите проверку."
+                    return@launch
+                }
+                val ok=withContext(Dispatchers.IO){SofixTrialManager.connectivityCheck()}
+                if(!ok){
+                    trialHint="VPN включён, но доступность интернета и Telegram не подтверждена. Повторите проверку."
+                    return@launch
+                }
+                trialHint="Интернет и Telegram доступны. Привязываем аккаунт…"
+                val telegramUrl=withContext(Dispatchers.IO){SofixTrialManager.beginLink(this@MainActivity)}
+                if(!trialTelegramOpened){
+                    trialTelegramOpened=true
+                    startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(telegramUrl)).addCategory(Intent.CATEGORY_BROWSABLE))
+                } else trialHint="Откройте Telegram для подтверждения привязки телефона."
+            }catch(e:Exception){
+                trialHint="Ошибка привязки: "+(e.message?:"Повторите попытку")
+            }finally{linkCheckBusy=false}
+        }
+    }
