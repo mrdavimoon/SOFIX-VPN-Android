@@ -1,49 +1,45 @@
-"""Static regression guards for the SOFIX v0.3 native build overlay.
-
-These checks run before heavy Android/NDK compilation and complement,
-but never replace, real device tests of Telegram and VpnService.
-"""
+"""Checks that Android first launch is a VPN screen, not a PIN/Telegram gate."""
 import unittest
 from pathlib import Path
+ROOT=Path(__file__).resolve().parents[2]
 
-ROOT = Path(__file__).resolve().parents[2]
-PAIR = ROOT / "android" / "SofixPairActivity.kt"
-UI = ROOT / "android" / "SofixHomeScreen.kt"
-OVERLAY = ROOT / "android" / "apply_overlay.py"
+class TrialFirstTests(unittest.TestCase):
+    def test_no_six_digit_android_pairing(self):
+        overlay=(ROOT/"android/apply_overlay.py").read_text()
+        home=(ROOT/"android/SofixHomeScreen.kt").read_text()
+        guest=(ROOT/"android/SofixGuest.kt").read_text()
+        self.assertNotIn("SofixPairActivity",overlay)
+        self.assertNotIn("pair_pin",guest+home)
+        self.assertIn("15 минут",overlay)
+        self.assertIn("НЕТ ПОДПИСКИ",home)
+        self.assertIn("ОФОРМИТЬ ПОДПИСКУ",home)
+        self.assertIn("SofixGuest.startTrial",overlay)
 
+    def test_trial_vpn_before_telegram(self):
+        overlay=(ROOT/"android/apply_overlay.py").read_text()
+        self.assertIn("SofixGuest.checkVpnAndTelegram",overlay)
+        self.assertIn("scheduleVerifyTelegram",overlay)
+        self.assertIn("SofixGuest.beginLink",overlay)
+        self.assertIn("SofixGuest.trialLeft",overlay)
+        self.assertIn("handleFabAction()",overlay)
+        self.assertIn("SofixHomeScreen(",overlay)
+        self.assertIn('versionName = "0.5.0-beta.1"',overlay)
 
-class PairingRegression(unittest.TestCase):
-    def test_polling_does_not_depend_on_completed_pairing(self):
-        code = PAIR.read_text()
-        self.assertIn("if (!token().isNullOrBlank()) check()", code)
-        self.assertNotIn("if (paired(this@SofixPairActivity)) check()", code)
+    def test_temporary_trial_and_no_web_identity_before_telegram(self):
+        code=(ROOT/"android/SofixGuest.kt").read_text()
+        self.assertIn('"/mobile/api/trial/start"',code)
+        self.assertIn('"/mobile/api/trial/link/start"',code)
+        self.assertIn("ConnectivityManager",code)
+        self.assertIn("TRANSPORT_VPN",code)
+        self.assertIn("https://telegram.org",code)
+        self.assertNotIn("Telegram.WebApp",code)
 
-    def test_existing_device_token_is_restored_after_telegram(self):
-        code = PAIR.read_text()
-        self.assertIn('prefs().getString("telegram_url", null)', code)
-        self.assertIn('prefs().getString("pair_pin", "")', code)
-        self.assertIn('if (!token().isNullOrBlank()) {', code)
-        self.assertIn('prefs().edit().putBoolean("pair_complete", true)', code)
+    def test_modern_ui_keeps_real_vpn_functions(self):
+        overlay=(ROOT/"android/apply_overlay.py").read_text()
+        for item in ("MainAction.RefreshGroups","MainAction.UpdateSubscriptions",
+                     "MainDestination.Settings","handleLayoutTestClick()",
+                     "SofixUpdateActivity","onUpdates"):
+            self.assertIn(item,overlay)
 
-    def test_no_premature_login_until_subscription_is_ready(self):
-        code = PAIR.read_text()
-        self.assertIn('getBoolean("pair_complete", false) && !p.getString(TOKEN, null).isNullOrBlank()', code)
-        self.assertIn('val url=r.getString("subscription_url")', code)
-        self.assertLess(code.index('val url=r.getString("subscription_url")'),
-                        code.index('prefs().edit().putBoolean("pair_complete", true)'))
-
-    def test_native_screen_preserves_vpn_actions(self):
-        ui = UI.read_text()
-        overlay = OVERLAY.read_text()
-        for needed in ("onPower()", 'onAccount("account")', 'onAccount("devices")',
-                       'onAccount("renew")', 'onVpnSettings()', "onRefresh()"):
-            self.assertIn(needed, ui)
-        for needed in ("handleFabAction()", "handleLayoutTestClick()", "MainAction.UpdateSubscriptions",
-                       "SofixHomeScreen(", "collectAsStateWithLifecycle()", "MainDestination.Settings"):
-            self.assertIn(needed, overlay)
-        self.assertNotIn("MainScreen(\\n", overlay)
-        self.assertIn('versionName = "0.4.0-beta.1"', overlay)
-
-
-if __name__ == "__main__":
+if __name__=="__main__":
     unittest.main()

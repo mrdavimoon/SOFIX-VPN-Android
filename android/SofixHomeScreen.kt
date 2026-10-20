@@ -61,9 +61,16 @@ fun SofixHomeScreen(
     onTest: () -> Unit,
     onVpnSettings: () -> Unit,
     onUpdates: () -> Unit,
+    hasSubscription: Boolean,
+    trialSeconds: Long,
+    accountLinked: Boolean,
+    guestBusy: Boolean,
+    guestNote: String,
+    onSubscribe: () -> Unit,
+    onLinkAccount: () -> Unit,
 ) {
     val accent by animateColorAsState(
-        targetValue = if (connected) mint else Color(0xFF799DA1),
+        targetValue = if (!hasSubscription && trialSeconds<=0) Color(0xFFFF6C72) else if (connected) mint else Color(0xFF799DA1),
         animationSpec = tween(380), label = "vpn-accent"
     )
     val glow by animateFloatAsState(
@@ -157,7 +164,7 @@ fun SofixHomeScreen(
                         )
                     }
                     Spacer(Modifier.height(13.dp))
-                    Text(if (connected) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
+                    Text(if (!hasSubscription && trialSeconds<=0) "НЕТ ПОДПИСКИ" else if (connected) "ОТКЛЮЧИТЬ" else "ПОДКЛЮЧИТЬ",
                         fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.6.sp, color = white)
                 }
             }
@@ -167,18 +174,43 @@ fun SofixHomeScreen(
             Box(Modifier.size(7.dp).background(if (connected) mint else Color(0xFF8BABB1), CircleShape))
             Spacer(Modifier.width(9.dp))
             Text(
-                if (!configured) "НЕТ СЕРВЕРА" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
+                if (!hasSubscription && trialSeconds<=0) "НЕТ ПОДПИСКИ" else if (trialSeconds>0 && !accountLinked) "ПРОБНЫЙ ДОСТУП" else if (connected) "ЗАЩИТА АКТИВНА" else "НЕ ПОДКЛЮЧЕНО",
                 fontSize = 12.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold,
                 color = if (connected) mint else Color(0xFFB7CCD0)
             )
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            if (!configured) "Обновите подписку или откройте кабинет" else
+            if (!hasSubscription && trialSeconds<=0) "Оформите подписку и получите 15 минут бесплатного VPN" else
+                if (trialSeconds>0 && !accountLinked) "Пробный доступ: осталось "+(trialSeconds/60+1)+" мин" else
                 if (connected) "Ваш интернет защищён" else "Нажмите кнопку, чтобы включить защиту",
             color = muted, fontSize = 13.sp, textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(29.dp))
+        Spacer(Modifier.height(17.dp))
+        if (!hasSubscription || trialSeconds>0) {
+            Box(
+                modifier=Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(if(guestBusy) Color(0xFF35534D) else Color(0xFFA3F4CE))
+                    .clickable(enabled=!guestBusy) {
+                        if (trialSeconds>0 && !accountLinked) onLinkAccount() else onSubscribe()
+                    }
+                    .padding(vertical=18.dp, horizontal=18.dp),
+                contentAlignment=Alignment.Center
+            ) {
+                Text(
+                    if(guestBusy) "ПОДКЛЮЧАЕМ…" else if(trialSeconds>0 && !accountLinked) "ПРОДОЛЖИТЬ В TELEGRAM ↗"
+                    else if(accountLinked && !hasSubscription) "ОФОРМИТЬ ПОДПИСКУ ↗"
+                    else "ОФОРМИТЬ ПОДПИСКУ",
+                    color=Color(0xFF062B25),fontWeight=FontWeight.ExtraBold,fontSize=13.sp,letterSpacing=1.sp
+                )
+            }
+        }
+        if (guestNote.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Text(guestNote,color=Color(0xFFD9E8E3),fontSize=12.sp,textAlign=TextAlign.Center)
+        }
+        Spacer(Modifier.height(19.dp))
         Column(
             Modifier.fillMaxWidth()
                 .border(1.dp, outline, RoundedCornerShape(21.dp))
@@ -195,7 +227,7 @@ fun SofixHomeScreen(
                 Column(Modifier.weight(1f)) {
                     Text("SOFIX · Основной сервер", color = white, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     Spacer(Modifier.height(3.dp))
-                    Text(if (configured) "Подписка загружена" else "Ожидается конфигурация",
+                    Text(if (trialSeconds>0 && !accountLinked) "Пробный доступ · 15 минут" else if (configured) "VPN доступен" else "Нет активного сервера",
                         color = muted, fontSize = 11.sp)
                 }
                 Text("↻", color = mint, fontSize = 23.sp)
