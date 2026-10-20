@@ -10,7 +10,7 @@ object SofixSubscription {
     private fun prefs(c:Context)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE)
     fun fetch(c:Context):String {
         val token=SofixTrialManager.token(c)
-            ?: c.getSharedPreferences("sofix_pair",Context.MODE_PRIVATE).getString("token",null)
+            ?: SofixLegacyPair.token(c)
             ?: return "Нет подписки · 15 минут бесплатно"
         val route=if(SofixTrialManager.token(c)!=null)
             "/mobile/api/trial/status" else "/mobile/api/me"

@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 759')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.8.1-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 760')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.8.2-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()

@@ -60,6 +60,58 @@
         super.onResume()
         updateTrialClock()
         if (SofixTrialManager.token(this)!=null) refreshTrialServerState()
+        else if(SofixLegacyPair.token(this)!=null) refreshLegacyDeviceState()
+    }
+
+    private var legacySyncInProgress = false
+
+    /**
+     * A paid legacy device can already be active on the server while the old
+     * local pairing flow never wrote pair_complete. Verify the saved token
+     * and restore its subscription without asking for another payment.
+     */
+    private fun refreshLegacyDeviceState() {
+        if(legacySyncInProgress)return
+        val token=SofixLegacyPair.token(this) ?: return
+        legacySyncInProgress=true
+        lifecycleScope.launch {
+            try {
+                val result=withContext(Dispatchers.IO) {
+                    SofixTrialManager.api("GET","/mobile/api/me",token)
+                }
+                when(result.optString("state")) {
+                    "ready" -> {
+                        val url=result.optString("subscription_url")
+                        if(!url.startsWith("https://"))
+                            throw IllegalStateException("Сервер не вернул подписку")
+                        val needsImport=!SofixLegacyPair.confirmed(this@MainActivity) ||
+                            mainViewModel.uiState.value.selectedGuid.isNullOrBlank()
+                        if(needsImport) {
+                            val imported=withContext(Dispatchers.IO) {
+                                AngConfigManager.importBatchConfig(url,"",false)
+                            }
+                            if(imported.first+imported.second<1)
+                                throw IllegalStateException("Не удалось загрузить конфигурацию")
+                            mainViewModel.onAction(MainAction.RefreshGroups)
+                        } else {
+                            mainViewModel.onAction(MainAction.UpdateSubscriptions)
+                        }
+                        SofixLegacyPair.markConfirmed(this@MainActivity)
+                        trialHint=""
+                        subscriptionLabel=try { withContext(Dispatchers.IO) {
+                            SofixSubscription.fetch(this@MainActivity)
+                        }} catch (_:Exception) { "Подписка подтверждена" }
+                    }
+                    "pending","setting_up" -> trialHint="Привязка телефона завершается. Повторите проверку."
+                    "no_subscription" -> trialHint="Телефон привязан, но подписка на сервере неактивна."
+                    else -> trialHint="Подписка устройства ещё не подтверждена."
+                }
+            }catch(e:Exception) {
+                // Never erase a valid legacy token due to temporary network failures.
+                trialHint="Не удалось проверить подписку. Проверьте интернет и повторите: "+
+                    (e.message ?: "временная ошибка")
+            }finally { legacySyncInProgress=false }
+        }
     }
 
     private fun refreshTrialServerState() {
