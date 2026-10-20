@@ -84,9 +84,12 @@
                         val url=result.optString("subscription_url")
                         if(!url.startsWith("https://"))
                             throw IllegalStateException("Сервер не вернул подписку")
-                        val needsImport=!SofixLegacyPair.confirmed(this@MainActivity) ||
-                            mainViewModel.uiState.value.selectedGuid.isNullOrBlank()
-                        if(needsImport) {
+                        // ImportUrlAsSubscription returns zero for a URL that
+                        // already exists. This is success, not a missing entitlement.
+                        val installed=MmkvManager.decodeSubscriptions().any {
+                            it.subscription.url==url
+                        }
+                        if(!installed) {
                             val imported=withContext(Dispatchers.IO) {
                                 AngConfigManager.importBatchConfig(url,"",false)
                             }
@@ -95,6 +98,8 @@
                             mainViewModel.onAction(MainAction.RefreshGroups)
                         } else {
                             mainViewModel.onAction(MainAction.UpdateSubscriptions)
+                            if(mainViewModel.uiState.value.selectedGuid.isNullOrBlank())
+                                mainViewModel.onAction(MainAction.RefreshGroups)
                         }
                         SofixLegacyPair.markConfirmed(this@MainActivity)
                         trialHint=""
