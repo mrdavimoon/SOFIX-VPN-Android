@@ -36,7 +36,17 @@ main = app / "src/main/java/com/v2ray/ang/ui/main/MainActivity.kt"
 s = main.read_text()
 needle = 'import com.v2ray.ang.AngApplication\n'
 assert s.count(needle) == 1
-s = s.replace(needle, '        if (!SofixPairActivity.paired(this)) {\n            startActivity(Intent(this, SofixPairActivity::class.java))\n            finish()\n            return\n        }\n' + needle)
+s = s.replace(needle, needle + 'import com.v2ray.ang.ui.sofix.SofixPairActivity\n')
+needle = '        mainViewModel.onAction(MainAction.Initialize)'
+assert s.count(needle) == 1
+gate = (
+    '        if (!SofixPairActivity.paired(this)) {\n'
+    '            startActivity(Intent(this, SofixPairActivity::class.java))\n'
+    '            finish()\n'
+    '            return\n'
+    '        }\n'
+)
+s = s.replace(needle, gate + needle)
 main.write_text(s)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
