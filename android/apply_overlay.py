@@ -252,6 +252,11 @@ helper = r"""    private var guestBusy by mutableStateOf(false)
     }
 
     private fun openLinkAfterTrial() {
+        if(SofixGuest.trialLeft(this)>0 && !SofixGuest.verified(this)) {
+            guestNote="Сначала дождёмся работающего VPN и ответа Telegram…"
+            scheduleVerifyTelegram()
+            return
+        }
         if(SofixGuest.claimed(this)) {
             openSofixMiniApp("account")
             return

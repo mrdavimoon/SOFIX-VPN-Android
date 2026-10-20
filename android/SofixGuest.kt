@@ -54,8 +54,11 @@ object SofixGuest {
     /** Starts one 15-minute 150 MB trial per installation. Must not run on main thread. */
     fun startTrial(context: Context): JSONObject {
         val p=prefs(context)
-        if (!p.getString("token",null).isNullOrBlank()) {
-            throw IllegalStateException("Пробный доступ уже выдавался. Продолжите через Telegram.")
+        val current=p.getString("token",null)
+        if (current!=null) {
+            val result=http("/mobile/api/trial/config","GET",current)
+            AngConfigManager.importBatchConfig(result.getString("subscription_url"),"",false)
+            return result
         }
         val install=p.getString("installation",null) ?: UUID.randomUUID().toString().also {
             p.edit().putString("installation",it).apply()
@@ -65,12 +68,11 @@ object SofixGuest {
         val response=http("/mobile/api/trial/start","POST",payload=data)
         val sub=response.getString("subscription_url")
         if(!sub.startsWith("https://"))throw IllegalStateException("Сервер не выдал VPN")
-        val result=AngConfigManager.importBatchConfig(sub,"",false)
-        // When imported once, a later import may deduplicate. Do not report success
-        // merely from the returned count; actual VPN and internet are tested next.
+        // Save the key first: a failed import must not burn the user's only trial.
         p.edit().putString("token",response.getString("device_token"))
             .putLong("expires_at",response.getLong("expires_at"))
             .putBoolean("linked",false).putBoolean("verified",false).apply()
+        AngConfigManager.importBatchConfig(sub,"",false)
         return response
     }
 
