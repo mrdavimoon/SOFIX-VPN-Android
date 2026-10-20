@@ -16,6 +16,12 @@ GitHub Actions `build.yml` fetches the pinned v2rayNG GPLv3 upstream source at c
 GNU GPL-3.0-or-later, as a derivative of [v2rayNG](https://github.com/2dust/v2rayNG). See `LICENSE`. This repository contains only public Android client code — **not** SOFIX server code, credentials, customer databases, or signing secrets. Preserve original authors' attributions when distributing builds.
 
 
+## Как устроено приложение
+
+- **VPN внутри Android**: один главный экран, подключение / отключение, состояние соединения, обновление VPN-конфигурации, технические настройки.
+- **Аккаунт через Telegram Mini App**: баланс, подписка, продление, устройства. Авторизация Android-приложения при первом запуске выполняется через Telegram и одноразовый код.
+- **Подпись**: тестовые APK по-прежнему имеют сборочную debug-подпись. Перестановка вместо обновления может потребовать отвязки старого устройства. До публичной стабильной версии нужен постоянный ключ подписи, а затем — встроенный updater.
+
 ## Версии и список изменений
 
 Каждый выпуск сопровождается текстовым списком изменений на русском языке: добавлено, исправлено, изменено и известные ограничения.

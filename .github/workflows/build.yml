@@ -37,6 +37,8 @@ jobs:
             exit 1
           fi
           echo "Release notes found: release-notes/$RELEASE_VERSION.md"
+      - name: Check Android pairing and UI regressions
+        run: python3 -m unittest discover -s android/tests -v
       - name: Prepare JDK 21
         uses: actions/setup-java@v4
         with:
