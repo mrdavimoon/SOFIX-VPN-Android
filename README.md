@@ -14,3 +14,16 @@ GitHub Actions `build.yml` fetches the pinned v2rayNG GPLv3 upstream source at c
 ## License
 
 GNU GPL-3.0-or-later, as a derivative of [v2rayNG](https://github.com/2dust/v2rayNG). See `LICENSE`. This repository contains only public Android client code — **not** SOFIX server code, credentials, customer databases, or signing secrets. Preserve original authors' attributions when distributing builds.
+
+
+## Версии и список изменений
+
+Каждый выпуск сопровождается текстовым списком изменений на русском языке: добавлено, исправлено, изменено и известные ограничения.
+
+- Полная история: [CHANGELOG.md](CHANGELOG.md).
+- Отдельные заметки: [release-notes/](release-notes/).
+- Перед новой версией создайте `release-notes/vX.Y.Z-beta.N.md` по [шаблону](release-notes/TEMPLATE.md) и обновите `CHANGELOG.md`.
+- Публикуйте через GitHub Actions **SOFIX Android APK (public beta)** → **Run workflow** → укажите `version` (например `v0.3.0-beta.1`). Сборка проверит наличие списка изменений и прикрепит к выпуску APK, `RELEASE_NOTES.md`, `CHANGELOG.md`, исходники и SHA256.
+- Без `version` создаётся только тестовый APK без нового релиза.
+
+Не объявляйте версию выпущенной, пока сборка, контроль SHA256 и публикация файлов не прошли успешно.
