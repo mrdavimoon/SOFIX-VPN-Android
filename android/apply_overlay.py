@@ -149,6 +149,10 @@ helper = r"""    private var guestBusy by mutableStateOf(false)
             }.start()
         }
         scheduleTrialClock()
+        // Android pauses this Activity while requesting VpnService permission.
+        // Resume the real network check when the VPN permission dialog closes.
+        if (SofixGuest.started(this) && !SofixGuest.verified(this)
+            && SofixGuest.trialLeft(this)>0) scheduleVerifyTelegram()
     }
 
     override fun onPause() {
