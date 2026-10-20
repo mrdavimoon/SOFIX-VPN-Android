@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -68,6 +70,9 @@ fun SofixHomeScreen(
     onboardingMessage: String,
     onSubscribe: () -> Unit,
     onLink: () -> Unit,
+    autoConnectOnBoot: Boolean,
+    onAutoConnectOnBoot: (Boolean) -> Unit,
+    onSystemVpnSettings: () -> Unit,
 ) {
     val accent by animateColorAsState(
         targetValue = if (!hasEntitlement) Color(0xFFFF666E) else if (connected) mint else Color(0xFF799DA1),
@@ -242,6 +247,30 @@ fun SofixHomeScreen(
             NavTile("НАСТРОЙКИ", "⚙", Modifier.weight(1f)) { onVpnSettings() }
         }
         Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .border(1.dp, outline, RoundedCornerShape(16.dp))
+                .background(Color(0xFF11262A), RoundedCornerShape(16.dp))
+                .padding(horizontal = 15.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("АВТОЗАПУСК VPN", color = white, fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp, letterSpacing = .6.sp)
+                Text("После включения телефона", color = muted, fontSize = 11.sp)
+            }
+            Switch(
+                checked = autoConnectOnBoot,
+                onCheckedChange = onAutoConnectOnBoot,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color(0xFF092E25),
+                    checkedTrackColor = mint
+                )
+            )
+        }
+        Spacer(Modifier.height(11.dp))
+        NavTile("ПОСТОЯННАЯ VPN В ANDROID", "↗", Modifier.fillMaxWidth()) { onSystemVpnSettings() }
+        Spacer(Modifier.height(11.dp))
         NavTile("ПРОВЕРИТЬ ОБНОВЛЕНИЯ", "↓", Modifier.fillMaxWidth()) { onUpdates() }
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {

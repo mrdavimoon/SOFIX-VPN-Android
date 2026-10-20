@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 755')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.5.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 756')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.6.0-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -72,10 +72,11 @@ import androidx.compose.material3.TextButton
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
+import android.provider.Settings
 """)
 anchor = '        mainViewModel.onAction(MainAction.Initialize)'
 assert s.count(anchor) == 1
-s = s.replace(anchor, anchor + "\n        startTrialPolling()")
+s = s.replace(anchor, anchor + "\n        startTrialPolling()\n        bootEnabled = MmkvManager.decodeStartOnBoot()")
 
 start = s.index('    @Composable\n    override fun ScreenContent() {')
 end = s.index('    private fun shareToClipboard(', start)
@@ -107,6 +108,15 @@ screen = """    @Composable
             onboardingMessage = trialHint,
             onSubscribe = { showSubscriptionOffer() },
             onLink = { verifyAndLinkTelegram() },
+            autoConnectOnBoot = bootEnabled,
+            onAutoConnectOnBoot = { enabled ->
+                MmkvManager.encodeStartOnBoot(enabled)
+                bootEnabled = enabled
+            },
+            onSystemVpnSettings = {
+                try { startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }
+                catch (_:Exception) { trialHint="Настройки VPN находятся в системных настройках Android." }
+            },
         )
         if(offerTrial) {
             AlertDialog(
@@ -142,11 +152,36 @@ miniapp = """    private fun openSofixMiniApp(section: String) {
 
 """
 trial = (overlay / "SofixTrialMain.kt.txt").read_text()
+trial = trial.replace(
+    '    private var offerTrial by mutableStateOf(false)',
+    '    private var bootEnabled by mutableStateOf(false)\n    private var offerTrial by mutableStateOf(false)'
+)
+assert "private var bootEnabled by mutableStateOf(false)" in trial
 s = s[:start] + screen + miniapp + trial + s[end:]
 main.write_text(s)
+
+boot_receiver = app / "src/main/java/com/v2ray/ang/receiver/BootReceiver.kt"
+boot_source = boot_receiver.read_text()
+anchor = 'import com.v2ray.ang.handler.SubscriptionUpdater\n'
+assert boot_source.count(anchor) == 1
+boot_source = boot_source.replace(anchor, anchor +
+    'import com.v2ray.ang.ui.sofix.SofixTrialManager\n' +
+    'import com.v2ray.ang.ui.sofix.SofixLegacyPair\n')
+anchor = '        LogUtil.i(AppConfig.TAG, "BootReceiver: Starting V2Ray service")'
+assert boot_source.count(anchor) == 1
+boot_source = boot_source.replace(anchor, """        if (SofixTrialManager.token(context) != null
+            && !SofixTrialManager.paid(context)
+            && !SofixLegacyPair.paired(context)
+            && SofixTrialManager.expiresAt(context) <= System.currentTimeMillis() / 1000L) {
+            LogUtil.i(AppConfig.TAG, "BootReceiver: Anonymous trial expired; skip autostart")
+            return
+        }
+
+""" + anchor)
+boot_receiver.write_text(boot_source)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
 for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixTrialManager.kt"):
     shutil.copy2(overlay / name, dest / name)
-print("SOFIX 0.5 trial-first VPN onboarding without Telegram prerequisite")
+print("SOFIX 0.6 VPN boot persistence and Android always-on settings")

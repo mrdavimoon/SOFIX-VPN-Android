@@ -13,7 +13,7 @@ class TrialFirstOnboarding(unittest.TestCase):
         self.assertNotIn("startActivity(Intent(this, SofixPairActivity::class.java))",OVERLAY)
         self.assertFalse((ROOT/"android/SofixPairActivity.kt").exists())
         self.assertNotIn("pin_hash",TRIAL)
-        self.assertIn('versionName = "0.5.0-beta.1"',OVERLAY)
+        self.assertIn('versionName = "0.6.0-beta.1"',OVERLAY)
     def test_home_starts_without_subscription(self):
         self.assertIn("НЕТ ПОДПИСКИ",UI)
         self.assertIn("ОФОРМИТЬ ПОДПИСКУ",UI)
