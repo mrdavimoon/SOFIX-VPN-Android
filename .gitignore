@@ -8,4 +8,6 @@ local.properties
 *.env
 .env*
 upstream/
-\n__pycache__/\n*.pyc\n
+
+__pycache__/
+*.pyc
