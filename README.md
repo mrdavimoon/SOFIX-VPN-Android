@@ -1,5 +1,7 @@
 # SOFIX VPN for Android — beta
 
+> **План SOFIX VPN 0.8:** [согласованное ТЗ, конфликты маршрутизации и тесты](docs/SOFIX_VPN_0_8_SPEC.md). Это только проектирование, функционал 0.8 не реализован и APK не собирался.
+
 Early Android client for SOFIX VPN with Telegram Mini App pairing and independent device subscriptions.
 
 - Device setup: SOFIX Android app requests a one-time pairing; user approves it in the official Telegram Mini App with the six-digit device code.
