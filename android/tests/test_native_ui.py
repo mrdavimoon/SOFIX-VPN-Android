@@ -42,7 +42,7 @@ class PairingRegression(unittest.TestCase):
                        "SofixHomeScreen(", "collectAsStateWithLifecycle()", "MainDestination.Settings"):
             self.assertIn(needed, overlay)
         self.assertNotIn("MainScreen(\\n", overlay)
-        self.assertIn('versionName = "0.3.0-beta.1"', overlay)
+        self.assertIn('versionName = "0.4.0-beta.1"', overlay)
 
 
 if __name__ == "__main__":

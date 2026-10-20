@@ -3,6 +3,7 @@ package com.v2ray.ang.ui.sofix
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import com.v2ray.ang.BuildConfig
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,6 +60,7 @@ fun SofixHomeScreen(
     onRefresh: () -> Unit,
     onTest: () -> Unit,
     onVpnSettings: () -> Unit,
+    onUpdates: () -> Unit,
 ) {
     val accent by animateColorAsState(
         targetValue = if (connected) mint else Color(0xFF799DA1),
@@ -211,6 +213,8 @@ fun SofixHomeScreen(
             NavTile("ПРОДЛИТЬ", "+", Modifier.weight(1f)) { onAccount("renew") }
             NavTile("НАСТРОЙКИ", "⚙", Modifier.weight(1f)) { onVpnSettings() }
         }
+        Spacer(Modifier.height(12.dp))
+        NavTile("ПРОВЕРИТЬ ОБНОВЛЕНИЯ", "↓", Modifier.fillMaxWidth()) { onUpdates() }
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text("ПРОВЕРИТЬ СОЕДИНЕНИЕ", modifier = Modifier
@@ -220,7 +224,7 @@ fun SofixHomeScreen(
                 color = if (connected) mint else muted, fontWeight = FontWeight.Bold,
                 fontSize = 10.sp, letterSpacing = 1.3.sp)
             Text("  •  ", color = outline)
-            Text("BETA 0.3", color = muted, fontSize = 10.sp)
+            Text(BuildConfig.VERSION_NAME.uppercase(), color = muted, fontSize = 10.sp)
         }
         if (connected && status.isNotBlank()) {
             Text(status, color = muted, fontSize = 11.sp, textAlign = TextAlign.Center)

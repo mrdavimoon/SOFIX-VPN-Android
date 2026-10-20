@@ -12,7 +12,7 @@ on:
       - 'android/**'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -71,20 +71,20 @@ jobs:
           mkdir -p V2rayNG/app/libs
           curl -fLSs --retry 3 "https://github.com/2dust/AndroidLibXrayLite/releases/download/${TAG}/libv2ray.aar" -o V2rayNG/app/libs/libv2ray.aar
           test "$(stat -c%s V2rayNG/app/libs/libv2ray.aar)" -gt 100000
-      - name: Build SOFIX VPN APK
+      - name: Build SOFIX VPN unsigned APK
         run: |
           cd upstream/V2rayNG
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           chmod +x gradlew
-          ./gradlew :app:assembleFdroidDebug --no-daemon --stacktrace -PABI_FILTERS=arm64-v8a
+          ./gradlew :app:assembleFdroidRelease --no-daemon --stacktrace -PABI_FILTERS=arm64-v8a
         env:
           GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8'
-      - name: Collect APK + checksums + GPL sources
+      - name: Collect unsigned APK + checksums + GPL sources
         run: |
           mkdir -p dist
-          find upstream/V2rayNG/app/build/outputs/apk -name '*arm64-v8a*.apk' -type f -print -exec cp '{}' dist/SOFIX-VPN-Android-arm64-beta.apk ';'
-          test -s dist/SOFIX-VPN-Android-arm64-beta.apk
-          (cd dist && sha256sum SOFIX-VPN-Android-arm64-beta.apk > SHA256SUMS)
+          find upstream/V2rayNG/app/build/outputs/apk -name '*arm64-v8a*.apk' -type f -print -exec cp '{}' dist/SOFIX-VPN-Android-arm64-unsigned.apk ';'
+          test -s dist/SOFIX-VPN-Android-arm64-unsigned.apk
+          (cd dist && sha256sum SOFIX-VPN-Android-arm64-unsigned.apk > SHA256SUMS)
           cp README.md dist/SOURCE.txt
           cp CHANGELOG.md dist/CHANGELOG.md
           zip -q -r dist/SOFIX-VPN-source.zip upstream android -x 'upstream/**/.git/**' 'upstream/**/build/**' 'upstream/**/.gradle/**' 'upstream/V2rayNG/app/libs/*.aar' 'upstream/libs/**'
@@ -94,25 +94,11 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           cp "release-notes/$RELEASE_VERSION.md" dist/RELEASE_NOTES.md
-      - name: Upload APK and GPL sources
+      # Signing occurs offline on the SOFIX server, outside public CI.
+      # Never publish the unsigned artifact as an installable release.
+      - name: Upload unsigned APK and GPL sources
         uses: actions/upload-artifact@v4
         with:
           name: sofix-vpn-android-beta
           path: dist/
           retention-days: 30
-      - name: Publish version with changelog attached
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ inputs.version }}
-        run: |
-          if gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error::Release $RELEASE_VERSION already exists; choose a new version."
-            exit 1
-          fi
-          gh release create "$RELEASE_VERSION" dist/SOFIX-VPN-Android-arm64-beta.apk \
-            dist/SOFIX-VPN-source.zip dist/SHA256SUMS dist/SOURCE.txt \
-            dist/CHANGELOG.md dist/RELEASE_NOTES.md \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "SOFIX VPN Android $RELEASE_VERSION" \
-            --notes-file dist/RELEASE_NOTES.md --prerelease

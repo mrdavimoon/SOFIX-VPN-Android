@@ -18,16 +18,20 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 753')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.3.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 754')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.4.0-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
 s = s.replace('android:allowBackup="true"', 'android:allowBackup="false"')
 s = s.replace('android:label="@string/app_name"', 'android:label="SOFIX VPN"')
+s = s.replace('    <uses-permission android:name="android.permission.INTERNET" />',
+              '    <uses-permission android:name="android.permission.INTERNET" />\n'
+              '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />')
 anchor = '        <activity\n            android:name=".ui.main.MainActivity"'
 assert s.count(anchor) == 1
 s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixPairActivity" android:exported="false" />\n' + anchor)
+s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixUpdateActivity" android:exported="false" />\n' + anchor)
 anchor = '            <meta-data\n                android:name="android.app.shortcuts"'
 assert s.count(anchor) == 1
 filters = """            <intent-filter android:autoVerify="true">
@@ -44,7 +48,11 @@ filters = """            <intent-filter android:autoVerify="true">
             </intent-filter>
 """
 s = s.replace(anchor, filters + anchor)
+anchor = '        <service\n'
+assert s.count(anchor) >= 1
+s = s.replace(anchor, '    <provider\n        android:name="androidx.core.content.FileProvider"\n        android:authorities="${applicationId}.sofix.updates"\n        android:exported="false"\n        android:grantUriPermissions="true">\n        <meta-data android:name="android.support.FILE_PROVIDER_PATHS"\n            android:resource="@xml/sofix_update_paths" />\n    </provider>\n'+anchor, 1)
 manifest.write_text(s)
+shutil.copy2(overlay / "sofix_update_paths.xml", app / "src/main/res/xml/sofix_update_paths.xml")
 
 main = app / "src/main/java/com/v2ray/ang/ui/main/MainActivity.kt"
 s = main.read_text()
@@ -52,6 +60,7 @@ anchor = 'import com.v2ray.ang.AngApplication\n'
 assert s.count(anchor) == 1
 s = s.replace(anchor, anchor + """import com.v2ray.ang.ui.sofix.SofixPairActivity
 import com.v2ray.ang.ui.sofix.SofixHomeScreen
+import com.v2ray.ang.ui.sofix.SofixUpdateActivity
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
@@ -80,6 +89,7 @@ screen = """    @Composable
             onRefresh = { mainViewModel.onAction(MainAction.UpdateSubscriptions) },
             onTest = { handleLayoutTestClick() },
             onVpnSettings = { navigateTo(MainDestination.Settings) },
+            onUpdates = { startActivity(Intent(this, SofixUpdateActivity::class.java)) },
         )
     }
 
@@ -101,6 +111,6 @@ main.write_text(s)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
-for name in ("SofixPairActivity.kt", "SofixHomeScreen.kt"):
+for name in ("SofixPairActivity.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt"):
     shutil.copy2(overlay / name, dest / name)
-print("SOFIX 0.3 native UI, VPN controls and safe pairing recovery installed")
+print("SOFIX 0.4 native UI, verified updater, VPN controls installed")
