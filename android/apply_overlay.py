@@ -58,7 +58,6 @@ imports = '\n'.join([
     'import androidx.compose.foundation.layout.Column',
     'import androidx.compose.foundation.layout.Box',
     'import androidx.compose.foundation.layout.fillMaxSize',
-    'import androidx.compose.foundation.layout.weight',
     'import androidx.compose.ui.Modifier',
     '',
 ])
@@ -110,6 +109,10 @@ method = '\n'.join([
     '',
 ])
 s = s.replace(anchor, method + anchor)
+# BoxScope becomes the implicit receiver inside the wrapped Compose UI;
+# pass MainActivity explicitly to the existing VPN restart logic.
+s = s.replace('LauncherManager.restartServiceOrStart(this, ::requestServiceStart)',
+              'LauncherManager.restartServiceOrStart(this@MainActivity, ::requestServiceStart)')
 main.write_text(s)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
