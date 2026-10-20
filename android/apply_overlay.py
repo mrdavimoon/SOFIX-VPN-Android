@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 756')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.6.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 757')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.7.0-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -31,7 +31,8 @@ s = s.replace('    <uses-permission android:name="android.permission.INTERNET" /
 anchor = '        <activity\n            android:name=".ui.main.MainActivity"'
 assert s.count(anchor) == 1
 
-s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixUpdateActivity" android:exported="false" />\n' + anchor)
+s = s.replace(anchor, '        <activity android:name=".ui.sofix.SofixSimpleSettingsActivity" android:exported="false" />\n'
+                      + '        <activity android:name=".ui.sofix.SofixUpdateActivity" android:exported="false" />\n' + anchor)
 anchor = '            <meta-data\n                android:name="android.app.shortcuts"'
 assert s.count(anchor) == 1
 filters = """            <intent-filter android:autoVerify="true">
@@ -61,6 +62,7 @@ assert s.count(anchor) == 1
 s = s.replace(anchor, anchor + """import com.v2ray.ang.ui.sofix.SofixLegacyPair
 import com.v2ray.ang.ui.sofix.SofixHomeScreen
 import com.v2ray.ang.ui.sofix.SofixUpdateActivity
+import com.v2ray.ang.ui.sofix.SofixSimpleSettingsActivity
 import com.v2ray.ang.ui.sofix.SofixTrialManager
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,7 +101,7 @@ screen = """    @Composable
             },
             onRefresh = { mainViewModel.onAction(MainAction.UpdateSubscriptions) },
             onTest = { handleLayoutTestClick() },
-            onVpnSettings = { navigateTo(MainDestination.Settings) },
+            onVpnSettings = { startActivity(Intent(this, SofixSimpleSettingsActivity::class.java)) },
             onUpdates = { startActivity(Intent(this, SofixUpdateActivity::class.java)) },
             hasEntitlement = SofixLegacyPair.paired(this) || trialPaid || trialMinutesLeft > 0,
             isTrial = !trialPaid && !SofixLegacyPair.paired(this) && trialMinutesLeft > 0,
@@ -182,6 +184,6 @@ boot_receiver.write_text(boot_source)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
-for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixTrialManager.kt"):
+for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixUpdateScreen.kt", "SofixSimpleSettingsActivity.kt", "SofixTrialManager.kt"):
     shutil.copy2(overlay / name, dest / name)
-print("SOFIX 0.6 VPN boot persistence and Android always-on settings")
+print("SOFIX 0.7 modern updater, simple native settings and boot VPN")

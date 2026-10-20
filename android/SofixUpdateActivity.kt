@@ -1,6 +1,10 @@
 package com.v2ray.ang.ui.sofix
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
@@ -28,7 +32,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** In-app release check, verified APK download, and user-approved Android installation. */
-class SofixUpdateActivity : Activity() {
+class SofixUpdateActivity : ComponentActivity() {
     private data class Release(
         val version: String,
         val notes: String,
@@ -38,10 +42,13 @@ class SofixUpdateActivity : Activity() {
     )
 
     private val busy = AtomicBoolean(false)
-    private lateinit var message: TextView
-    private lateinit var notes: TextView
-    private lateinit var check: Button
-    private lateinit var install: Button
+    private var message by mutableStateOf("Проверяем наличие обновлений…")
+    private var changeText by mutableStateOf("")
+    private var phase by mutableStateOf("checking")
+    private var percent by mutableStateOf(0)
+    private var latest by mutableStateOf<String?>(null)
+    private var available by mutableStateOf(false)
+    private var isWorking by mutableStateOf(false)
     private var candidate: Release? = null
     private var verifiedFile: File? = null
     private val pkgApi = "https://api.github.com/repos/mrdavimoon/SOFIX-VPN-Android/releases?per_page=10"
@@ -50,52 +57,23 @@ class SofixUpdateActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(7, 21, 25)
-        window.navigationBarColor = Color.rgb(7, 21, 25)
-        val screen = ScrollView(this).apply {
-            isFillViewport = true
-            setBackgroundColor(Color.rgb(7, 21, 25))
+        window.statusBarColor = android.graphics.Color.rgb(8, 22, 26)
+        window.navigationBarColor = android.graphics.Color.rgb(8, 22, 26)
+        setContent {
+            SofixUpdateScreen(
+                current=BuildConfig.VERSION_NAME,
+                latest=latest,
+                message=message,
+                changes=changeText,
+                stage=phase,
+                progress=percent,
+                busy=isWorking,
+                updateAvailable=available,
+                onCheck={checkReleases()},
+                onDownload={downloadUpdate()},
+                onBack={finish()}
+            )
         }
-        val dp = resources.displayMetrics.density
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding((24*dp).toInt(),(45*dp).toInt(),(24*dp).toInt(),(30*dp).toInt())
-        }
-        fun label(s: String, size: Float, color: Int = Color.WHITE) = TextView(this).apply {
-            text=s; textSize=size; setTextColor(color)
-            setPadding(0,(9*dp).toInt(),0,(9*dp).toInt())
-        }
-        fun rounded(bg: Int) = GradientDrawable().apply {
-            setColor(bg); cornerRadius = 15*dp
-        }
-        fun button(s:String) = Button(this).apply {
-            text = s; isAllCaps = false
-            background = rounded(Color.rgb(158, 241, 204))
-            setTextColor(Color.rgb(9,45,37)); setTypeface(null,Typeface.BOLD)
-        }
-        root.addView(label("SOFIX  /  VPN",30f,Color.rgb(158,241,204)).apply {
-            setTypeface(null,Typeface.BOLD)
-        })
-        root.addView(label("Обновления приложения",24f).apply { setTypeface(null,Typeface.BOLD) })
-        root.addView(label("Установлено: "+BuildConfig.VERSION_NAME,14f,Color.rgb(164,191,188)))
-        message=label("Нажмите «Проверить обновления».",14f,Color.rgb(190,213,206))
-        root.addView(message)
-        check=button("Проверить обновления").apply { setOnClickListener { checkReleases() } }
-        root.addView(check)
-        notes=label("",13f,Color.rgb(180,203,197))
-        root.addView(notes)
-        install=button("Скачать и установить").apply {
-            visibility = View.GONE
-            setOnClickListener { downloadUpdate() }
-        }
-        root.addView(install)
-        root.addView(label("Android попросит подтвердить установку. Подписка и настройки сохранятся при обновлении поверх приложения с той же подписью.",12f,Color.rgb(129,156,158)))
-        val back=label("← Вернуться к VPN",14f,Color.rgb(158,241,204))
-        back.gravity=Gravity.CENTER
-        back.setOnClickListener { finish() }
-        root.addView(back)
-        screen.addView(root)
-        setContentView(screen)
         checkReleases()
     }
 
@@ -115,13 +93,12 @@ class SofixUpdateActivity : Activity() {
 
     private fun async(task: () -> Unit) {
         if (!busy.compareAndSet(false,true)) return
-        check.isEnabled = false
-        install.isEnabled = false
+        isWorking=true
         Thread {
             try { task() }
             finally {
                 busy.set(false)
-                ui { check.isEnabled=true; install.isEnabled=true }
+                ui { isWorking=false }
             }
         }.start()
     }
@@ -186,9 +163,13 @@ class SofixUpdateActivity : Activity() {
     }
 
     private fun checkReleases() {
-        message.text="Проверяем обновления…"
-        notes.text=""
-        install.visibility=View.GONE
+        if (busy.get()) return
+        message="Проверяем наличие обновлений…"
+        changeText=""
+        available=false
+        latest=null
+        phase="checking"
+        percent=0
         candidate=null
         async {
             try {
@@ -202,21 +183,27 @@ class SofixUpdateActivity : Activity() {
                 val nextRelease=winner
                 candidate=nextRelease
                 ui {
-                    if (nextRelease==null) message.text="У вас последняя доступная версия SOFIX VPN."
-                    else {
-                        message.text="Доступно обновление "+nextRelease.version+" · "+
-                            (nextRelease.apkBytes/1_000_000)+" МБ"
-                        notes.text=nextRelease.notes.ifBlank { "Список изменений пока не указан." }
-                        install.visibility=View.VISIBLE
+                    if(nextRelease==null) {
+                        phase="ready"
+                        message="У вас последняя версия SOFIX VPN"
+                    } else {
+                        phase="ready"
+                        latest=nextRelease.version
+                        available=true
+                        message="Новая версия · "+(nextRelease.apkBytes/1_000_000)+" МБ"
+                        changeText=nextRelease.notes.ifBlank { "Список изменений пока не указан." }
                     }
                 }
-            } catch(e: Exception) {ui { message.text="Не удалось проверить обновления: "+e.message }}
+            } catch(e: Exception) {ui { phase="error";message="Не удалось проверить обновления: "+e.message }}
         }
     }
 
     private fun downloadUpdate() {
         val release=candidate ?: return
-        message.text="Проверяем подпись файла и готовим загрузку…"
+        if (busy.get()) return
+        phase="downloading"
+        percent=0
+        message="Загружаем и проверяем обновление…"
         async {
             val out=File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir,
                          "sofix-update.apk")
@@ -245,9 +232,9 @@ class SofixUpdateActivity : Activity() {
                                 output.write(bytes,0,n)
                                 md.update(bytes,0,n)
                                 val progress=(count*100/release.apkBytes).toInt().coerceAtMost(100)
-                                if (progress/5>lastProgress/5) {
+                                if (progress>lastProgress) {
                                     lastProgress=progress
-                                    ui { message.text="Загружаем обновление: $progress%" }
+                                    ui { percent=progress }
                                 }
                             }
                         }
@@ -262,21 +249,23 @@ class SofixUpdateActivity : Activity() {
                     if (apkInfo.versionCode<=packageManager.getPackageInfo(packageName,0).versionCode)
                         throw IllegalStateException("Загруженная версия не новее установленной")
                     ui {
-                        message.text="Файл проверен. Для обновления Android запросит подтверждение."
+                        phase="verified"
+                        percent=100
+                        message="Файл проверен. Подтвердите установку в Android."
                         verifiedFile=out
                         beginInstall(out)
                     }
                 } finally { connection.disconnect() }
             } catch(e:Exception) {
                 out.delete()
-                ui { message.text="Ошибка обновления: "+e.message }
+                ui { phase="error";message="Ошибка обновления: "+e.message }
             }
         }
     }
 
     private fun beginInstall(apk:File) {
         if (Build.VERSION.SDK_INT>=26 && !packageManager.canRequestPackageInstalls()) {
-            message.text="Разрешите установку обновлений из SOFIX VPN в настройках Android."
+            message="Разрешите установку обновлений из SOFIX VPN в настройках Android."
             try {
                 startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:"+packageName)))
@@ -300,7 +289,8 @@ class SofixUpdateActivity : Activity() {
             }
             startActivity(intent)
         }catch(e:Exception){
-            message.text="Не удалось открыть установку: "+e.message
+            message="Не удалось открыть установку: "+e.message
+            phase="error"
         }
     }
 }

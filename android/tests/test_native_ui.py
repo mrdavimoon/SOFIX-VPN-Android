@@ -13,7 +13,7 @@ class TrialFirstOnboarding(unittest.TestCase):
         self.assertNotIn("startActivity(Intent(this, SofixPairActivity::class.java))",OVERLAY)
         self.assertFalse((ROOT/"android/SofixPairActivity.kt").exists())
         self.assertNotIn("pin_hash",TRIAL)
-        self.assertIn('versionName = "0.6.0-beta.1"',OVERLAY)
+        self.assertIn('versionName = "0.7.0-beta.1"',OVERLAY)
     def test_home_starts_without_subscription(self):
         self.assertIn("НЕТ ПОДПИСКИ",UI)
         self.assertIn("ОФОРМИТЬ ПОДПИСКУ",UI)
@@ -33,7 +33,7 @@ class TrialFirstOnboarding(unittest.TestCase):
         self.assertIn("SofixLegacyPair.paired(this)",OVERLAY)
     def test_vpn_engine_and_settings_preserved(self):
         for symbol in ("handleFabAction()","MainAction.UpdateSubscriptions",
-                       "collectAsStateWithLifecycle()","MainDestination.Settings"):
+                       "collectAsStateWithLifecycle()","SofixSimpleSettingsActivity"):
             self.assertIn(symbol,OVERLAY)
         self.assertIn("MainAction.RefreshGroups",FLOW)
 
