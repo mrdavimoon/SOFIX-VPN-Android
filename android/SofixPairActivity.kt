@@ -25,8 +25,8 @@ class SofixPairActivity : Activity() {
         private const val API = "https://lk.sofixconnection.ru"
         private const val PREF = "sofix_pair"
         private const val TOKEN = "token"
-        fun paired(a: Activity) = !a.getSharedPreferences(PREF, MODE_PRIVATE)
-            .getString(TOKEN, "").isNullOrEmpty()
+        fun paired(a: Activity) = a.getSharedPreferences(PREF, MODE_PRIVATE)
+            .getBoolean("pair_complete", false)
     }
     private val handler = Handler(Looper.getMainLooper())
     private val busy = AtomicBoolean(false)
@@ -72,7 +72,7 @@ class SofixPairActivity : Activity() {
             telegramUrl?.let { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
         }
         open.visibility = View.GONE; root.addView(open)
-        root.addView(btn("Начать заново") { prefs().edit().remove(TOKEN).apply(); startPairing() })
+        root.addView(btn("Начать заново") { prefs().edit().remove(TOKEN).remove("pair_complete").apply(); startPairing() })
         setContentView(root)
         if (paired(this)) { begin.visibility = View.GONE; info.text = "Проверяем привязку…" }
     }
@@ -132,6 +132,7 @@ class SofixPairActivity : Activity() {
                         val url=r.getString("subscription_url")
                         if (!url.startsWith("https://")) throw IllegalStateException("Неверная ссылка VPN")
                         AngConfigManager.importBatchConfig(url,"",false)
+                        prefs().edit().putBoolean("pair_complete", true).apply()
                         completed=true
                         ui {
                             info.text="Подписка получена!"
@@ -142,7 +143,7 @@ class SofixPairActivity : Activity() {
             } catch (e: Exception) {
                 val msg=e.message.orEmpty()
                 if (msg.contains("отвязано",true)||msg.contains("истёк",true)||msg.contains("авторизовано",true)) {
-                    prefs().edit().remove(TOKEN).apply()
+                    prefs().edit().remove(TOKEN).remove("pair_complete").apply()
                     ui { code.text="";open.visibility=View.GONE;begin.visibility=View.VISIBLE;info.text="Привязка недействительна. Начните заново." }
                 } else ui { info.text="Проверяем соединение: "+msg }
             }
