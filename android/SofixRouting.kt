@@ -4,6 +4,8 @@ import android.content.Context
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.dto.entities.RulesetItem
+import com.v2ray.ang.util.JsonUtil
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.IDN
@@ -87,15 +89,63 @@ object SofixRouting {
     }
 
     /**
+     * v2rayNG ships a non-empty WHITE rule set to every clean installation.
+     * It is not an expert customization and must NOT disable SOFIX routing.
+     * Compare semantics to the actual bundled asset; never match just by size.
+     */
+    fun isUntouchedFactoryPreset(c:Context, items:List<RulesetItem>):Boolean {
+        if (items.isEmpty()) return false
+        return try {
+            val asset=c.assets.open("custom_routing_white")
+                .bufferedReader().use { it.readText() }
+            val expected=JsonUtil.fromJsonSafe(asset,Array<RulesetItem>::class.java)
+                ?.toList().orEmpty()
+            items.size==expected.size && items.zip(expected).all { (a,b) ->
+                a.ip==b.ip && a.domain==b.domain && a.process==b.process &&
+                a.outboundTag==b.outboundTag && a.port==b.port &&
+                a.network==b.network && a.protocol==b.protocol &&
+                a.enabled==b.enabled && a.locked==b.locked
+            }
+        } catch (_:Exception){false}
+    }
+
+    /** Whether SOFIX may replace the legacy routing rules at runtime. */
+    fun managedActive(c:Context):Boolean {
+        val experts=MmkvManager.decodeRoutingRulesets().orEmpty().filter { it.enabled }
+        if(experts.isEmpty() || isUntouchedFactoryPreset(c,experts))return true
+        return c.getSharedPreferences(PREFS,0).getBoolean("expert_confirmed",false)
+    }
+
+    fun customRulesRequireConsent(c:Context):Boolean = !managedActive(c)
+
+    /** Never delete the old v2rayNG entries: they remain available for rollback. */
+    fun enableManagedWithLegacyBackup(c:Context) {
+        val original=MmkvManager.decodeRoutingRulesets().orEmpty()
+        val prefs=c.getSharedPreferences(PREFS,0)
+        val backup=JsonUtil.toJson(original)
+        check(prefs.edit().putString("expert_backup",backup)
+            .putBoolean("expert_confirmed",true).commit())
+    }
+
+    fun canRestoreExpert(c:Context):Boolean {
+        val prefs=c.getSharedPreferences(PREFS,0)
+        return prefs.getBoolean("expert_confirmed",false) &&
+            prefs.contains("expert_backup")
+    }
+
+    fun restoreLegacyRules(c:Context) {
+        check(c.getSharedPreferences(PREFS,0).edit()
+            .putBoolean("expert_confirmed",false).commit())
+    }
+
+    /**
      * Compiles priority rules directly into Xray. DNS-specific inbounds are kept
      * ahead of routing; default direct for selected mode must remain *after* DNS.
      * Returns false if an expert legacy ruleset needs explicit migration.
      */
     fun apply(c: Context, config:V2rayConfig):Boolean {
         // No silent rewriting of user-defined advanced routing.
-        val expert=MmkvManager.decodeRoutingRulesets().orEmpty().filter{it.enabled}
-        if(expert.isNotEmpty() && !c.getSharedPreferences(PREFS,0).getBoolean("expert_confirmed",false))
-            return false
+        if(!managedActive(c))return false
 
         val direct=entries(c,false)
         val proxy=entries(c,true)
@@ -107,6 +157,7 @@ object SofixRouting {
         // LAN is internal and never forwarded by proxy routing.
         rules.add(V2rayConfig.RoutingBean.RulesBean(
             ip=listOf("geoip:private"),outboundTag=AppConfig.TAG_DIRECT))
+        add(AppConfig.TAG_DIRECT,listOf("geosite:private"))
         // More specific user exceptions first. Use exact host + suffix matching.
         val manual=(direct.map{it to AppConfig.TAG_DIRECT}+proxy.map{it to AppConfig.TAG_PROXY})
             .sortedWith(compareByDescending<Pair<String,String>>{it.first.length}.thenBy{it.first})
@@ -118,7 +169,10 @@ object SofixRouting {
         }
         // First insert high-priority domain/IP rules; they do not match dns-out
         // inbounds by themselves. Existing Xray DNS rules must remain intact.
-        config.routing.rules.addAll(0,rules)
+        val dnsCount=config.routing.rules.takeWhile {
+            it.outboundTag=="dns-out" && it.port=="53"
+        }.size
+        config.routing.rules.addAll(dnsCount,rules)
         // For "selected" we must default to direct only AFTER all DNS routes.
         if(mode(c)==SELECTED) {
             config.routing.rules.add(V2rayConfig.RoutingBean.RulesBean(

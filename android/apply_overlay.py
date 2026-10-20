@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 758')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.8.0-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 759')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.8.1-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -198,6 +198,13 @@ for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt
     shutil.copy2(overlay / name, dest / name)
 core=app / "src/main/java/com/v2ray/ang/core/CoreConfigManager.kt"
 core_source=core.read_text()
+# The default v2rayNG preset is not a manually customized ruleset.
+# SOFIX's smart rules supersede this factory preset, while custom user
+# expert rules stay available for explicit opt-in and rollback.
+legacy='        rulesetItems?.forEach { key ->\n            appendRoutingUserRule(configContext, key, v2rayConfig, policyGroupBalancerTags)\n        }'
+managed='        if (!com.v2ray.ang.ui.sofix.SofixRouting.managedActive(configContext.context)) {\n            rulesetItems?.forEach { key ->\n                appendRoutingUserRule(configContext, key, v2rayConfig, policyGroupBalancerTags)\n            }\n        }'
+assert core_source.count(legacy)==1
+core_source=core_source.replace(legacy,managed)
 anchor="        configureRootModeDns(v2rayConfig)\n"
 assert core_source.count(anchor)==1
 core_source=core_source.replace(anchor,anchor+"        com.v2ray.ang.ui.sofix.SofixRouting.apply(configContext.context,v2rayConfig)\n")

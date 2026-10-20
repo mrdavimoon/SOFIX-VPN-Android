@@ -12,8 +12,8 @@ class UpdateSafetyTests(unittest.TestCase):
         self.assertIn("REQUEST_INSTALL_PACKAGES",text)
         self.assertIn("grantUriPermissions",text)
         self.assertIn("onUpdates",text)
-        self.assertIn("versionCode = 758",text)
-        self.assertIn("versionName = \"0.8.0-beta.1\"",text)
+        self.assertIn("versionCode = 759",text)
+        self.assertIn("versionName = \"0.8.1-beta.1\"",text)
 
     def test_updater_validates_download_before_installation(self):
         text=(ROOT/"android/SofixUpdateActivity.kt").read_text()
@@ -37,7 +37,7 @@ class UpdateSafetyTests(unittest.TestCase):
         self.assertIn("onUpdates()",text)
 
     def test_release_notes_exist(self):
-        self.assertGreater((ROOT/"release-notes/v0.8.0-beta.1.md").stat().st_size,1000)
+        self.assertGreater((ROOT/"release-notes/v0.8.1-beta.1.md").stat().st_size,1000)
 
 if __name__=="__main__":
     unittest.main()

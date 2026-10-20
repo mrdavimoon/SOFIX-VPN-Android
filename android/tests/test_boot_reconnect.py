@@ -11,8 +11,8 @@ class BootBehaviorTests(unittest.TestCase):
         settings=(ROOT/"android/SofixSimpleSettingsActivity.kt").read_text()
         self.assertIn("MmkvManager.encodeStartOnBoot(it)", settings)
         self.assertIn("autostart=it", settings)
-        self.assertIn('0.8.0-beta.1', source)
-        self.assertIn('versionCode = 758', source)
+        self.assertIn('0.8.1-beta.1', source)
+        self.assertIn('versionCode = 759', source)
 
     def test_expired_trial_skips_boot(self):
         src=(ROOT/"android/apply_overlay.py").read_text()

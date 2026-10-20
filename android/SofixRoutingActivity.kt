@@ -35,6 +35,10 @@ class SofixRoutingActivity:ComponentActivity() {
     private var notice by mutableStateOf("")
     private var addingProxy by mutableStateOf<Boolean?>(null)
     private var version by mutableIntStateOf(0)
+    private var expertConflict by mutableStateOf(false)
+    private var showExpertConfirmation by mutableStateOf(false)
+    private var showExpertRestore by mutableStateOf(false)
+    private var canRestore by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +54,30 @@ class SofixRoutingActivity:ComponentActivity() {
                 Spacer(Modifier.height(6.dp))
                 Text("SOFIX выбирает путь к сайтам. Вы всегда можете изменить решение.",
                     color=muted,fontSize=13.sp)
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(17.dp))
+                if (expertConflict) {
+                    Column(Modifier.fillMaxWidth()
+                        .border(1.dp,Color(0xFFFFC37D),RoundedCornerShape(15.dp))
+                        .background(Color(0xFF342A24),RoundedCornerShape(15.dp))
+                        .padding(15.dp)) {
+                        Text("Правила SOFIX пока не применяются",
+                            color=Color(0xFFFFCF9B),fontWeight=FontWeight.Bold)
+                        Spacer(Modifier.height(5.dp))
+                        Text("На телефоне найдены ваши прежние технические правила. " +
+                            "Чтобы избежать конфликтов, выберите, какую систему использовать.",
+                            color=white,fontSize=12.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Использовать правила SOFIX →",color=mint,fontSize=13.sp,
+                            modifier=Modifier.clickable { showExpertConfirmation=true })
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (canRestore) {
+                    Text("Вернуться к прежним техническим правилам",
+                        color=muted,fontSize=12.sp,
+                        modifier=Modifier.clickable{showExpertRestore=true}.padding(10.dp))
+                }
+                Spacer(Modifier.height(9.dp))
                 listOf(
                     Triple("smart","Умный · рекомендуется",
                         "Российские сайты напрямую, ограниченные и неизвестные — через VPN"),
@@ -65,7 +92,8 @@ class SofixRoutingActivity:ComponentActivity() {
                         .clickable{
                             SofixRouting.setMode(this@SofixRoutingActivity,id)
                             refreshLocal()
-                            notice="Режим сохранён. Переподключите VPN для применения."
+                            notice=if(expertConflict)"Режим сохранён, но пока заблокирован техническими правилами."
+                                else "Режим сохранён. Переподключите VPN для применения."
                         }.padding(15.dp),
                         verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -76,7 +104,8 @@ class SofixRoutingActivity:ComponentActivity() {
                         RadioButton(selected=activeMode==id,onClick={
                             SofixRouting.setMode(this@SofixRoutingActivity,id)
                             refreshLocal()
-                            notice="Режим сохранён. Переподключите VPN для применения."
+                            notice=if(expertConflict)"Режим сохранён, но пока заблокирован техническими правилами."
+                                else "Режим сохранён. Переподключите VPN для применения."
                         })
                     }
                 }
@@ -115,6 +144,33 @@ class SofixRoutingActivity:ComponentActivity() {
                     fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
                 Spacer(Modifier.height(35.dp))
             }
+            if(showExpertConfirmation)AlertDialog(
+                onDismissRequest={showExpertConfirmation=false},
+                title={Text("Перейти на маршрутизацию SOFIX?")},
+                text={Text("Прежние технические правила сохранятся в резервной копии. "+
+                    "SOFIX начнёт управлять маршрутами после переподключения VPN. "+
+                    "Вы сможете вернуться к старым настройкам.")},
+                confirmButton={TextButton(onClick={
+                    SofixRouting.enableManagedWithLegacyBackup(this@SofixRoutingActivity)
+                    showExpertConfirmation=false
+                    refreshLocal()
+                    notice="SOFIX включён. Переподключите VPN для применения."
+                }){Text("Переключиться")}},
+                dismissButton={TextButton(onClick={showExpertConfirmation=false}){Text("Отмена")}}
+            )
+            if(showExpertRestore)AlertDialog(
+                onDismissRequest={showExpertRestore=false},
+                title={Text("Вернуться к прежним правилам?")},
+                text={Text("Ваши старые технические маршруты сохранены. "+
+                    "После возврата маршрутизация SOFIX не будет применяться. "+
+                    "Потребуется переподключение VPN.")},
+                confirmButton={TextButton(onClick={
+                    SofixRouting.restoreLegacyRules(this@SofixRoutingActivity)
+                    showExpertRestore=false;refreshLocal()
+                    notice="Старые правила восстановлены. Переподключите VPN."
+                }){Text("Вернуться")}},
+                dismissButton={TextButton(onClick={showExpertRestore=false}){Text("Отмена")}}
+            )
             if(addingProxy!=null)AlertDialog(
                 onDismissRequest={addingProxy=null;input=""},
                 title={Text(if(addingProxy==true)"Всегда через VPN" else "Всегда напрямую")},
@@ -129,7 +185,8 @@ class SofixRoutingActivity:ComponentActivity() {
                 confirmButton={TextButton(onClick={
                     try {
                         SofixRouting.mutate(this@SofixRoutingActivity,input,addingProxy==true)
-                        notice="Правило сохранено. Переподключите VPN для применения."
+                        notice=if(expertConflict)"Правило сохранено, но ещё не применяется. Сначала выберите систему маршрутизации."
+                            else "Правило сохранено. Переподключите VPN для применения."
                         refreshLocal();addingProxy=null;input=""
                     }catch(e:Exception){notice=e.message?:"Неверный домен";addingProxy=null}
                 }){Text("Сохранить")}},
@@ -142,6 +199,8 @@ class SofixRoutingActivity:ComponentActivity() {
         proxyItems=SofixRouting.entries(this,true)
         directItems=SofixRouting.entries(this,false)
         version=SofixRuleUpdates.version(this)
+        expertConflict=SofixRouting.customRulesRequireConsent(this)
+        canRestore=SofixRouting.canRestoreExpert(this)
     }
     @Composable private fun Action(label:String,onClick:()->Unit) {
         Box(Modifier.fillMaxWidth().background(mint,RoundedCornerShape(12.dp))
