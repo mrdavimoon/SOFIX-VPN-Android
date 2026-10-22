@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 760')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.8.2-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 761')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.8.3-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -63,6 +63,8 @@ s = main.read_text()
 anchor = 'import com.v2ray.ang.AngApplication\n'
 assert s.count(anchor) == 1
 s = s.replace(anchor, anchor + """import com.v2ray.ang.ui.sofix.SofixLegacyPair
+import com.v2ray.ang.ui.sofix.SofixPaidPair
+import com.v2ray.ang.ui.sofix.SofixApiException
 import com.v2ray.ang.ui.sofix.SofixHomeScreen
 import com.v2ray.ang.ui.sofix.SofixUpdateActivity
 import com.v2ray.ang.ui.sofix.SofixSimpleSettingsActivity
@@ -98,7 +100,8 @@ screen = """    @Composable
             configured = !state.selectedGuid.isNullOrBlank(),
             status = mainViewModel.formatStatus(state.status),
             onPower = {
-                if (!SofixLegacyPair.paired(this) && !trialPaid && trialMinutesLeft <= 0) showSubscriptionOffer()
+                if (legacyRevoked && !trialPaid) beginPaidPair()
+                else if (!SofixLegacyPair.paired(this) && !trialPaid && trialMinutesLeft <= 0) showSubscriptionOffer()
                 else handleFabAction()
             },
             onAccount = { section ->
@@ -110,13 +113,18 @@ screen = """    @Composable
             onTest = { handleLayoutTestClick() },
             onVpnSettings = { startActivity(Intent(this, SofixSimpleSettingsActivity::class.java)) },
             onUpdates = { startActivity(Intent(this, SofixUpdateActivity::class.java)) },
-            hasEntitlement = SofixLegacyPair.paired(this) || trialPaid || trialMinutesLeft > 0,
-            isTrial = !trialPaid && !SofixLegacyPair.paired(this) && trialMinutesLeft > 0,
+            hasEntitlement = (SofixLegacyPair.paired(this) && !legacyRevoked) || trialPaid || trialMinutesLeft > 0,
+            isTrial = !trialPaid && !(SofixLegacyPair.paired(this) && !legacyRevoked) && trialMinutesLeft > 0,
             trialMinutes = trialMinutesLeft,
             linked = trialLinked,
             onboardingMessage = trialHint,
             onSubscribe = { showSubscriptionOffer() },
             onLink = { verifyAndLinkTelegram() },
+            onRestore = { beginPaidPair() },
+            showRestore = legacyRevoked || (!SofixLegacyPair.paired(this) && !trialPaid) ||
+                SofixPaidPair.isPending(this),
+            recoverRequired = legacyRevoked,
+            restoring = paidPairBusy,
             autoConnectOnBoot = bootEnabled,
             onAutoConnectOnBoot = { enabled ->
                 MmkvManager.encodeStartOnBoot(enabled)
@@ -130,6 +138,26 @@ screen = """    @Composable
                 catch (_:Exception) { trialHint="Настройки VPN находятся в системных настройках Android." }
             },
         )
+        if(showPaidPairDialog) {
+            AlertDialog(
+                onDismissRequest = { showPaidPairDialog=false },
+                title = { Text("Привязка к действующей подписке") },
+                text = { Text("Ваш код: " + paidPairPin +
+                    "\n\n1. Запомните шесть цифр.\n" +
+                    "2. Откройте Telegram и подтвердите этот телефон.\n" +
+                    "3. Вернитесь сюда. Повторная оплата не нужна.") },
+                confirmButton = {
+                    TextButton(onClick = { openPaidPairTelegram() }) {
+                        Text("Открыть Telegram")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPaidPairDialog=false; resumePaidPair() }) {
+                        Text("Проверить привязку")
+                    }
+                },
+            )
+        }
         if(offerTrial) {
             AlertDialog(
                 onDismissRequest = { offerTrial = false },
@@ -194,7 +222,7 @@ boot_receiver.write_text(boot_source)
 
 dest = app / "src/main/java/com/v2ray/ang/ui/sofix"
 dest.mkdir(parents=True, exist_ok=True)
-for name in ("SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixUpdateScreen.kt", "SofixSimpleSettingsActivity.kt", "SofixTrialManager.kt", "SofixRouting.kt", "SofixRuleUpdates.kt", "SofixRoutingActivity.kt", "SofixDiagnosticsActivity.kt", "SofixSubscription.kt", "SofixDemoActivity.kt"):
+for name in ("SofixPaidPair.kt", "SofixLegacyPair.kt", "SofixHomeScreen.kt", "SofixUpdateActivity.kt", "SofixUpdateScreen.kt", "SofixSimpleSettingsActivity.kt", "SofixTrialManager.kt", "SofixRouting.kt", "SofixRuleUpdates.kt", "SofixRoutingActivity.kt", "SofixDiagnosticsActivity.kt", "SofixSubscription.kt", "SofixDemoActivity.kt"):
     shutil.copy2(overlay / name, dest / name)
 core=app / "src/main/java/com/v2ray/ang/core/CoreConfigManager.kt"
 core_source=core.read_text()

@@ -8,6 +8,8 @@ import java.net.URL
 import java.util.UUID
 
 /** Short-lived unauthenticated trial. No Telegram required until after VPN is working. */
+class SofixApiException(val statusCode:Int, message:String):IllegalStateException(message)
+
 object SofixTrialManager {
     private const val BASE = "https://lk.sofixconnection.ru"
     private const val PREF = "sofix_trial"
@@ -46,7 +48,7 @@ object SofixTrialManager {
             val text=stream?.bufferedReader()?.use{it.readText()} ?: "{}"
             val json=JSONObject(text)
             if(code !in 200..299)
-                throw IllegalStateException(json.optString("detail","HTTP "+code))
+                throw SofixApiException(code,json.optString("detail","HTTP "+code))
             return json
         }finally{conn.disconnect()}
     }

@@ -13,7 +13,9 @@
                     connectionStatus=sampled.name
                 }
                 if(count%3==0) {
-                    subscriptionLabel=try {withContext(Dispatchers.IO){
+                    subscriptionLabel=if(legacyRevoked) {
+                        "Телефон отвязан · восстановите через Telegram"
+                    } else try {withContext(Dispatchers.IO){
                         SofixSubscription.fetch(this@MainActivity)
                     }}catch (_:Exception){
                         SofixSubscription.cached(this@MainActivity)+" · последняя проверка"
@@ -56,11 +58,120 @@
         }
     }
 
+    private var legacyRevoked by mutableStateOf(false)
+    private var paidPairBusy by mutableStateOf(false)
+    private var showPaidPairDialog by mutableStateOf(false)
+    private var paidPairPin by mutableStateOf("")
+
     override fun onResume() {
         super.onResume()
         updateTrialClock()
-        if (SofixTrialManager.token(this)!=null) refreshTrialServerState()
-        else if(SofixLegacyPair.token(this)!=null) refreshLegacyDeviceState()
+        // Pending paid pairing has priority after returning from Telegram.
+        // An old anonymous trial must never mask a recovered paid device.
+        when {
+            SofixPaidPair.isPending(this) -> resumePaidPair()
+            SofixLegacyPair.token(this)!=null -> refreshLegacyDeviceState()
+            SofixTrialManager.token(this)!=null -> refreshTrialServerState()
+        }
+    }
+
+    /** Import and select the paid device's OWN key, not a revoked older key. */
+    private suspend fun installVerifiedPaidConfig(url:String) {
+        require(url.startsWith("https://"))
+        var sub=MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.url==url }
+        if(sub==null) {
+            val added=withContext(Dispatchers.IO){
+                AngConfigManager.importBatchConfig(url,"",false)
+            }
+            if(added.first+added.second<=0)
+                throw IllegalStateException("Не удалось загрузить новую VPN-конфигурацию")
+            sub=MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.url==url }
+        }
+        val verifiedSub=sub ?: throw IllegalStateException("VPN-подписка не сохранилась")
+        var candidates=MmkvManager.decodeServerList(verifiedSub.guid)
+        if(candidates.isEmpty()) {
+            withContext(Dispatchers.IO){AngConfigManager.updateConfigViaSub(verifiedSub)}
+            candidates=MmkvManager.decodeServerList(verifiedSub.guid)
+        }
+        val selected=candidates.firstOrNull()
+            ?: throw IllegalStateException("Не удалось получить сервер VPN. Повторите проверку.")
+        mainViewModel.onAction(MainAction.SelectServer(selected))
+        mainViewModel.onAction(MainAction.RefreshGroups)
+    }
+
+    /** Existing paid customer: no free trial, no new payment, no automatic
+     * reactivation of revoked tokens. The owner must confirm in Telegram. */
+    private fun beginPaidPair() {
+        if(paidPairBusy)return
+        if(SofixPaidPair.isPending(this)) {
+            paidPairPin=SofixPaidPair.pin(this).orEmpty()
+            showPaidPairDialog=true
+            return
+        }
+        paidPairBusy=true
+        trialHint="Готовим безопасную привязку телефона…"
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO){SofixPaidPair.start(this@MainActivity)}
+                paidPairPin=SofixPaidPair.pin(this@MainActivity).orEmpty()
+                showPaidPairDialog=true
+                trialHint="Подтвердите этот телефон в своём Telegram. Повторная оплата не нужна."
+            }catch(e:Exception){
+                trialHint="Не удалось начать привязку: "+(e.message?:"Проверьте интернет")
+            }finally {paidPairBusy=false}
+        }
+    }
+
+    private fun openPaidPairTelegram() {
+        val link=SofixPaidPair.telegramUrl(this) ?: run {
+            trialHint="Запрос устарел. Создайте новый код привязки."
+            return
+        }
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(link))
+                .addCategory(Intent.CATEGORY_BROWSABLE))
+            showPaidPairDialog=false
+        }catch (_:Exception){
+            trialHint="Не удалось открыть Telegram. Проверьте приложение Telegram."
+        }
+    }
+
+    private fun resumePaidPair() {
+        if(paidPairBusy || !SofixPaidPair.isPending(this))return
+        paidPairBusy=true
+        lifecycleScope.launch {
+            try {
+                val status=withContext(Dispatchers.IO){SofixPaidPair.check(this@MainActivity)}
+                when(status.optString("state")) {
+                    "ready" -> {
+                        val url=status.getString("subscription_url")
+                        installVerifiedPaidConfig(url)
+                        // The token is moved only after server proof and config import.
+                        SofixPaidPair.complete(this@MainActivity)
+                        legacyRevoked=false
+                        showPaidPairDialog=false
+                        trialHint="Подписка и этот телефон успешно привязаны."
+                        subscriptionLabel=withContext(Dispatchers.IO){
+                            SofixSubscription.fetch(this@MainActivity)
+                        }
+                    }
+                    "pending" -> trialHint="Подтвердите привязку телефона в Telegram, указав код с экрана."
+                    "setting_up" -> trialHint="Telegram подтвердил телефон. Сервер готовит VPN-ключ. Повторите проверку."
+                    "no_subscription" -> trialHint="Телефон подтверждён, но у Telegram-аккаунта нет активной подписки."
+                    else -> trialHint="Проверяем привязку…"
+                }
+            }catch(e:SofixApiException) {
+                if(e.statusCode==401 || e.statusCode==403) {
+                    // Keep the old paid credential unchanged. A new challenge
+                    // may be started, but only by an explicit user action.
+                    SofixPaidPair.clear(this@MainActivity)
+                    showPaidPairDialog=false
+                    trialHint="Код привязки недействителен. Нажмите «Восстановить подписку» для нового кода."
+                }else trialHint="Проверка привязки недоступна. Повторите после восстановления интернета."
+            }catch(e:Exception) {
+                trialHint="Не удалось закончить привязку: "+(e.message?:"Повторите проверку")
+            }finally {paidPairBusy=false}
+        }
     }
 
     private var legacySyncInProgress = false
@@ -84,24 +195,9 @@
                         val url=result.optString("subscription_url")
                         if(!url.startsWith("https://"))
                             throw IllegalStateException("Сервер не вернул подписку")
-                        // ImportUrlAsSubscription returns zero for a URL that
-                        // already exists. This is success, not a missing entitlement.
-                        val installed=MmkvManager.decodeSubscriptions().any {
-                            it.subscription.url==url
-                        }
-                        if(!installed) {
-                            val imported=withContext(Dispatchers.IO) {
-                                AngConfigManager.importBatchConfig(url,"",false)
-                            }
-                            if(imported.first+imported.second<1)
-                                throw IllegalStateException("Не удалось загрузить конфигурацию")
-                            mainViewModel.onAction(MainAction.RefreshGroups)
-                        } else {
-                            mainViewModel.onAction(MainAction.UpdateSubscriptions)
-                            if(mainViewModel.uiState.value.selectedGuid.isNullOrBlank())
-                                mainViewModel.onAction(MainAction.RefreshGroups)
-                        }
+                        installVerifiedPaidConfig(url)
                         SofixLegacyPair.markConfirmed(this@MainActivity)
+                        legacyRevoked=false
                         trialHint=""
                         subscriptionLabel=try { withContext(Dispatchers.IO) {
                             SofixSubscription.fetch(this@MainActivity)
@@ -111,9 +207,19 @@
                     "no_subscription" -> trialHint="Телефон привязан, но подписка на сервере неактивна."
                     else -> trialHint="Подписка устройства ещё не подтверждена."
                 }
+            }catch(e:SofixApiException) {
+                if(e.statusCode==401 || e.statusCode==403) {
+                    // Actual server rejection is different from a network error.
+                    legacyRevoked=true
+                    subscriptionLabel="Телефон отвязан · восстановите через Telegram"
+                    trialHint="Действующая подписка принадлежит Telegram-аккаунту. "+
+                        "Этот телефон нужно привязать заново, платить повторно не нужно."
+                }else {
+                    trialHint="Не удалось проверить подписку. Проверьте интернет и повторите."
+                }
             }catch(e:Exception) {
-                // Never erase a valid legacy token due to temporary network failures.
-                trialHint="Не удалось проверить подписку. Проверьте интернет и повторите: "+
+                // Network failures must not turn a paid subscriber into a trial.
+                trialHint="Не удалось проверить подключение: "+
                     (e.message ?: "временная ошибка")
             }finally { legacySyncInProgress=false }
         }

@@ -70,6 +70,10 @@ fun SofixHomeScreen(
     onboardingMessage: String,
     onSubscribe: () -> Unit,
     onLink: () -> Unit,
+    onRestore: () -> Unit,
+    showRestore: Boolean,
+    recoverRequired: Boolean,
+    restoring: Boolean,
     autoConnectOnBoot: Boolean,
     onAutoConnectOnBoot: (Boolean) -> Unit,
     onSystemVpnSettings: () -> Unit,
@@ -189,7 +193,8 @@ fun SofixHomeScreen(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            if (!hasEntitlement) "15 минут бесплатного VPN перед оформлением" else
+            if (!hasEntitlement && recoverRequired) "Телефон отвязан. Восстановите доступ через Telegram." else
+                if (!hasEntitlement) "15 минут бесплатного VPN перед оформлением" else
                 if (isTrial && connected) "Соединение активно. Проверяем доступность Telegram" else
                 if (connected && networkState=="WAITING_NETWORK") "VPN ждёт восстановления Wi-Fi" else
                 if (connected && networkState!="CONNECTED") "Проверяем доступность сети через SOFIX" else
@@ -229,7 +234,23 @@ fun SofixHomeScreen(
             Spacer(Modifier.height(12.dp))
             Text("Нажмите, чтобы обновить подключение", color = muted, fontSize = 11.sp)
         }
-        if(!hasEntitlement || isTrial){
+        if(showRestore) {
+            Spacer(Modifier.height(15.dp))
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(17.dp))
+                .border(1.dp,mint,RoundedCornerShape(17.dp))
+                .clickable(enabled = !restoring) { onRestore() }
+                .padding(17.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+                Text(if(restoring) "ПРОВЕРЯЕМ ПРИВЯЗКУ…" else
+                    if(recoverRequired) "ВОССТАНОВИТЬ ПОДПИСКУ  →" else
+                    "У МЕНЯ УЖЕ ЕСТЬ ПОДПИСКА  →",
+                    color=mint,fontSize=13.sp,fontWeight=FontWeight.ExtraBold)
+                Spacer(Modifier.height(5.dp))
+                Text("Привязать телефон через Telegram · без повторной оплаты",
+                    color=muted,fontSize=11.sp,textAlign=TextAlign.Center)
+            }
+        }
+        if((!hasEntitlement && !recoverRequired) || isTrial){
             Spacer(Modifier.height(15.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp))
                  .background(Brush.horizontalGradient(listOf(Color(0xFFB4F7D9),Color(0xFF6FD4BC))))

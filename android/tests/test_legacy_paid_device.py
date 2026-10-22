@@ -19,12 +19,15 @@ class LegacyPaidDeviceRecovery(unittest.TestCase):
     def test_subscription_recovered_without_new_device_payment(self):
         flow=(ROOT/'android/SofixTrialMain.kt.txt').read_text()
         block=flow[flow.index('private fun refreshLegacyDeviceState()'):flow.index('private fun refreshTrialServerState()')]
-        self.assertIn('AngConfigManager.importBatchConfig(url,"",false)',block)
-        self.assertIn('MainAction.RefreshGroups',block)
-        self.assertIn('MainAction.UpdateSubscriptions',block)
-        self.assertIn('MmkvManager.decodeSubscriptions().any',block)
-        self.assertIn('it.subscription.url==url',block)
-        self.assertIn('if(!installed)',block)
+        self.assertIn('installVerifiedPaidConfig(url)',block)
+        self.assertIn('AngConfigManager.importBatchConfig(url,"",false)',flow)
+        self.assertIn('MmkvManager.decodeServerList(verifiedSub.guid)',flow)
+        self.assertIn('MainAction.SelectServer(selected)',flow)
+        self.assertIn('MainAction.RefreshGroups',flow)
+        self.assertIn('MainAction.SelectServer(selected)',flow)
+        self.assertIn('MmkvManager.decodeSubscriptions().firstOrNull',flow)
+        self.assertIn('it.subscription.url==url',flow)
+        self.assertIn('if(sub==null)',flow)
         self.assertNotIn('SofixTrialManager.start',block)
         self.assertNotIn('/mobile/api/pair/start',block)
         self.assertNotIn('beginLink(',block)
@@ -41,9 +44,9 @@ class LegacyPaidDeviceRecovery(unittest.TestCase):
         self.assertIn('SofixLegacyPair.token(c)',sub)
     def test_version(self):
         s=(ROOT/'android/apply_overlay.py').read_text()
-        self.assertIn('versionCode = 760',s)
-        self.assertIn('0.8.2-beta.1',s)
-        self.assertTrue((ROOT/'release-notes/v0.8.2-beta.1.md').exists())
+        self.assertIn('versionCode = 761',s)
+        self.assertIn('0.8.3-beta.1',s)
+        self.assertTrue((ROOT/'release-notes/v0.8.3-beta.1.md').exists())
 
 if __name__=='__main__':
  unittest.main()

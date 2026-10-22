@@ -27,4 +27,13 @@ object SofixLegacyPair {
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
             .putBoolean("pair_complete", true).apply()
     }
+
+    /** Change the credential only after server-verified Telegram approval. */
+    fun saveConfirmedToken(context: Context, token:String) {
+        require(token.matches(Regex("[A-Za-z0-9_-]{43}")))
+        check(context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit()
+            .putString("token",token)
+            .putBoolean("pair_complete",true)
+            .commit())
+    }
 }

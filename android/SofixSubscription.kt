@@ -9,12 +9,21 @@ object SofixSubscription {
     private const val PREF="sofix_sub_display"
     private fun prefs(c:Context)=c.getSharedPreferences(PREF,Context.MODE_PRIVATE)
     fun fetch(c:Context):String {
-        val token=SofixTrialManager.token(c)
-            ?: SofixLegacyPair.token(c)
-            ?: return "Нет подписки · 15 минут бесплатно"
-        val route=if(SofixTrialManager.token(c)!=null)
-            "/mobile/api/trial/status" else "/mobile/api/me"
-        val data=SofixTrialManager.api("GET",route,token)
+        val paid=SofixLegacyPair.token(c)
+        val trial=SofixTrialManager.token(c)
+        if(paid==null && trial==null)
+            return "Нет подписки · 15 минут бесплатно"
+        // A paid device must override an old (possibly expired) trial.
+        // Only fall back when the old paid token has actually been revoked.
+        val data=if(paid!=null) {
+            try {
+                SofixTrialManager.api("GET","/mobile/api/me",paid)
+            }catch(e:SofixApiException){
+                if(e.statusCode in listOf(401,403) && trial!=null)
+                    SofixTrialManager.api("GET","/mobile/api/trial/status",trial)
+                else throw e
+            }
+        }else SofixTrialManager.api("GET","/mobile/api/trial/status",trial)
         val state=data.optString("state","unknown")
         val seconds=data.optLong("expires_at",0)-System.currentTimeMillis()/1000L
         val phrase=when(state){
