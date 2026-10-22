@@ -143,8 +143,8 @@ screen = """    @Composable
                 onDismissRequest = { showPaidPairDialog=false },
                 title = { Text("Привязка к действующей подписке") },
                 text = { Text("Ваш код: " + paidPairPin +
-                    "\n\n1. Запомните шесть цифр.\n" +
-                    "2. Откройте Telegram и подтвердите этот телефон.\n" +
+                    "\\n\\n1. Запомните шесть цифр.\\n" +
+                    "2. Откройте Telegram и подтвердите этот телефон.\\n" +
                     "3. Вернитесь сюда. Повторная оплата не нужна.") },
                 confirmButton = {
                     TextButton(onClick = { openPaidPairTelegram() }) {
