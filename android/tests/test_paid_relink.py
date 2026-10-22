@@ -28,7 +28,10 @@ class PaidRelinkTests(unittest.TestCase):
         self.assertIn('private const val PREF = "sofix_paid_pair_pending"',PAIR)
         self.assertIn('when(status.optString("state"))',MAIN)
         self.assertIn('"ready" -> {',MAIN)
-        self.assertIn("val pin=result.getString",PAIR)
+        self.assertIn('.put("confirmation_mode","telegram")',PAIR)
+        self.assertNotIn('getString("pin")',PAIR)
+        self.assertIn('.remove("pin")',PAIR)
+        self.assertIn('Код вводить не нужно',OVER)
         self.assertIn("Telegram Mini App",PAIR)
 
     def test_revoked_token_exposes_recovery_not_payment(self):
@@ -60,8 +63,8 @@ class PaidRelinkTests(unittest.TestCase):
         self.assertIn("SofixTrialManager.start",MAIN)
 
     def test_release_version(self):
-        self.assertIn('versionCode = 761',OVER)
-        self.assertIn('0.8.3-beta.1',OVER)
+        self.assertIn('versionCode = 762',OVER)
+        self.assertIn('0.8.4-beta.1',OVER)
 
 
 if __name__=="__main__":unittest.main()

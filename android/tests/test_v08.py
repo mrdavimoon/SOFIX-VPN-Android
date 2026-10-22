@@ -54,9 +54,9 @@ class Version08(unittest.TestCase):
             self.assertNotIn(bad,demo)
         self.assertIn("versionTaps>=7",(ROOT/"android/SofixSimpleSettingsActivity.kt").read_text())
     def test_08_release_note_not_yet_release(self):
-        p=ROOT/"release-notes/v0.8.3-beta.1.md"
+        p=ROOT/"release-notes/v0.8.4-beta.1.md"
         self.assertGreater(p.stat().st_size,1000)
-        self.assertIn('versionCode = 761',(ROOT/"android/apply_overlay.py").read_text())
+        self.assertIn('versionCode = 762',(ROOT/"android/apply_overlay.py").read_text())
 
 if __name__=="__main__":
     unittest.main()

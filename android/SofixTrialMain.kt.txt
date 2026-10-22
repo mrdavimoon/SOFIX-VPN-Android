@@ -61,7 +61,6 @@
     private var legacyRevoked by mutableStateOf(false)
     private var paidPairBusy by mutableStateOf(false)
     private var showPaidPairDialog by mutableStateOf(false)
-    private var paidPairPin by mutableStateOf("")
 
     override fun onResume() {
         super.onResume()
@@ -104,8 +103,7 @@
     private fun beginPaidPair() {
         if(paidPairBusy)return
         if(SofixPaidPair.isPending(this)) {
-            paidPairPin=SofixPaidPair.pin(this).orEmpty()
-            showPaidPairDialog=true
+            openPaidPairTelegram()
             return
         }
         paidPairBusy=true
@@ -113,9 +111,8 @@
         lifecycleScope.launch {
             try {
                 withContext(Dispatchers.IO){SofixPaidPair.start(this@MainActivity)}
-                paidPairPin=SofixPaidPair.pin(this@MainActivity).orEmpty()
-                showPaidPairDialog=true
-                trialHint="Подтвердите этот телефон в своём Telegram. Повторная оплата не нужна."
+                trialHint="Подтвердите свой телефон в Telegram. Повторная оплата не нужна."
+                openPaidPairTelegram()
             }catch(e:Exception){
                 trialHint="Не удалось начать привязку: "+(e.message?:"Проверьте интернет")
             }finally {paidPairBusy=false}
@@ -124,7 +121,7 @@
 
     private fun openPaidPairTelegram() {
         val link=SofixPaidPair.telegramUrl(this) ?: run {
-            trialHint="Запрос устарел. Создайте новый код привязки."
+            trialHint="Запрос устарел. Создайте новый запрос привязки."
             return
         }
         try {
@@ -155,7 +152,7 @@
                             SofixSubscription.fetch(this@MainActivity)
                         }
                     }
-                    "pending" -> trialHint="Подтвердите привязку телефона в Telegram, указав код с экрана."
+                    "pending" -> trialHint="Подтвердите привязку телефона в Telegram. Код вводить не нужно."
                     "setting_up" -> trialHint="Telegram подтвердил телефон. Сервер готовит VPN-ключ. Повторите проверку."
                     "no_subscription" -> trialHint="Телефон подтверждён, но у Telegram-аккаунта нет активной подписки."
                     else -> trialHint="Проверяем привязку…"

@@ -16,24 +16,25 @@ object SofixPaidPair {
     private fun prefs(c:Context) = c.getSharedPreferences(PREF,Context.MODE_PRIVATE)
 
     fun pendingToken(c:Context):String? =
-        prefs(c).getString("device_token",null)?.takeIf{it.length==43}
-    fun pin(c:Context):String? = prefs(c).getString("pin",null)
+        prefs(c).getString("device_token",null)?.takeIf{
+            it.length==43 && prefs(c).getString("mode",null)=="telegram"
+        }
     fun telegramUrl(c:Context):String? = prefs(c).getString("telegram_url",null)
     fun isPending(c:Context):Boolean = pendingToken(c)!=null
 
     fun start(c:Context):String {
         val name=(Build.MANUFACTURER+" "+Build.MODEL).trim().take(64)
         val body=JSONObject().put("device_name",name)
+            .put("confirmation_mode","telegram")
         val result=SofixTrialManager.api("POST","/mobile/api/pair/start",body=body)
         val token=result.getString("device_token")
         val challengeUrl=result.getString("telegram_url")
-        val pin=result.getString("pin")
         require(token.matches(Regex("[A-Za-z0-9_-]{43}")))
-        require(pin.matches(Regex("[0-9]{6}")))
         require(challengeUrl.startsWith("https://t.me/SofixVpnBot?startapp=device_"))
         check(prefs(c).edit()
             .putString("device_token",token)
-            .putString("pin",pin)
+            .remove("pin")
+            .putString("mode","telegram")
             .putString("telegram_url",challengeUrl)
             .putLong("created_at",System.currentTimeMillis()/1000L)
             .commit())

@@ -18,8 +18,8 @@ def change(path, old, new):
 
 build = app / "build.gradle.kts"
 change(build, 'applicationId = "com.v2ray.ang"', 'applicationId = "com.sofix.vpn"')
-change(build, 'versionCode = 752', 'versionCode = 761')
-change(build, 'versionName = "2.3.12"', 'versionName = "0.8.3-beta.1"')
+change(build, 'versionCode = 752', 'versionCode = 762')
+change(build, 'versionName = "2.3.12"', 'versionName = "0.8.4-beta.1"')
 
 manifest = app / "src/main/AndroidManifest.xml"
 s = manifest.read_text()
@@ -142,10 +142,8 @@ screen = """    @Composable
             AlertDialog(
                 onDismissRequest = { showPaidPairDialog=false },
                 title = { Text("Привязка к действующей подписке") },
-                text = { Text("Ваш код: " + paidPairPin +
-                    "\\n\\n1. Запомните шесть цифр.\\n" +
-                    "2. Откройте Telegram и подтвердите этот телефон.\\n" +
-                    "3. Вернитесь сюда. Повторная оплата не нужна.") },
+                text = { Text("Откройте Telegram и подтвердите этот телефон. " +
+                    "Код вводить не нужно. Повторная оплата не нужна.") },
                 confirmButton = {
                     TextButton(onClick = { openPaidPairTelegram() }) {
                         Text("Открыть Telegram")

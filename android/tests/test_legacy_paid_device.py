@@ -44,9 +44,9 @@ class LegacyPaidDeviceRecovery(unittest.TestCase):
         self.assertIn('SofixLegacyPair.token(c)',sub)
     def test_version(self):
         s=(ROOT/'android/apply_overlay.py').read_text()
-        self.assertIn('versionCode = 761',s)
-        self.assertIn('0.8.3-beta.1',s)
-        self.assertTrue((ROOT/'release-notes/v0.8.3-beta.1.md').exists())
+        self.assertIn('versionCode = 762',s)
+        self.assertIn('0.8.4-beta.1',s)
+        self.assertTrue((ROOT/'release-notes/v0.8.4-beta.1.md').exists())
 
 if __name__=='__main__':
  unittest.main()
