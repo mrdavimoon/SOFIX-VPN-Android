@@ -63,8 +63,8 @@ class PaidRelinkTests(unittest.TestCase):
         self.assertIn("SofixTrialManager.start",MAIN)
 
     def test_release_version(self):
-        self.assertIn('versionCode = 762',OVER)
-        self.assertIn('0.8.4-beta.1',OVER)
+        self.assertIn('versionCode = 763',OVER)
+        self.assertIn('0.8.5-beta.1',OVER)
 
 
 if __name__=="__main__":unittest.main()

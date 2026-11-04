@@ -19,7 +19,15 @@ object SofixRuleUpdates {
     private const val URL_RULES =
         "https://raw.githubusercontent.com/mrdavimoon/SOFIX-VPN-Android/main/rules/manifest.json"
     private const val PUB="MCowBQYDK2VwAyEAZctsxIaZi/5OCzVsz2tged0PEjJyEVWqGD7/M0u192c="
-    private val fallbackBlocked=setOf("youtube.com","instagram.com","facebook.com","twitter.com")
+    private val fallbackBlocked=setOf(
+        "youtube.com","youtu.be","googlevideo.com","ytimg.com",
+        "instagram.com","cdninstagram.com","facebook.com","fbcdn.net",
+        "telegram.org","t.me","telegram.me","telesco.pe",
+        "whatsapp.com","whatsapp.net","wa.me",
+        "tiktok.com","tiktokcdn.com","tiktokv.com",
+        "discord.com","discord.gg","discordapp.com",
+        "claude.ai","anthropic.com","twitter.com","x.com"
+    )
     fun blocked(c:Context):List<String> = stored(c,"blocked_domains",fallbackBlocked)
     fun ru(c:Context):List<String> = stored(c,"ru_domains",emptySet())
     fun version(c:Context):Int = c.getSharedPreferences(PREF,0).getInt("version",0)

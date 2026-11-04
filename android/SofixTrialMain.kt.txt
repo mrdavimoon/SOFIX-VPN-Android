@@ -87,12 +87,24 @@
             sub=MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.url==url }
         }
         val verifiedSub=sub ?: throw IllegalStateException("VPN-подписка не сохранилась")
-        var candidates=MmkvManager.decodeServerList(verifiedSub.guid)
-        if(candidates.isEmpty()) {
-            withContext(Dispatchers.IO){AngConfigManager.updateConfigViaSub(verifiedSub)}
-            candidates=MmkvManager.decodeServerList(verifiedSub.guid)
-        }
-        val selected=candidates.firstOrNull()
+        // Pull the newest server list even when the paid subscription already exists:
+        // SMART Moscow endpoints and foreign egress may change without an APK update.
+        // A failed refresh must never erase a working, locally cached profile.
+        withContext(Dispatchers.IO){ AngConfigManager.updateConfigViaSub(verifiedSub) }
+        val candidates=MmkvManager.decodeServerList(verifiedSub.guid)
+        val selected=mainViewModel.uiState.value.selectedGuid?.takeIf { it in candidates }
+            ?: candidates.firstOrNull { guid ->
+                val profile=MmkvManager.decodeServerConfig(guid)
+                val title=profile?.remarks.orEmpty()
+                title.contains("Москва SMART",ignoreCase=true) &&
+                    title.contains("TCP",ignoreCase=true) &&
+                    profile?.network.equals("tcp",ignoreCase=true)
+            }
+            ?: candidates.firstOrNull { guid ->
+                !MmkvManager.decodeServerConfig(guid)?.remarks.orEmpty()
+                    .contains("UDP",ignoreCase=true)
+            }
+            ?: candidates.firstOrNull()
             ?: throw IllegalStateException("Не удалось получить сервер VPN. Повторите проверку.")
         mainViewModel.onAction(MainAction.SelectServer(selected))
         mainViewModel.onAction(MainAction.RefreshGroups)

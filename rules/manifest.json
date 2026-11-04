@@ -1,4 +1,4 @@
 {
-  "payload": "{\"blocked_domains\":[\"discord.com\",\"facebook.com\",\"instagram.com\",\"twitter.com\",\"youtube.com\"],\"expires_at\":1808063155,\"format\":1,\"generated_at\":1792511155,\"ru_domains\":[\"gosuslugi.ru\",\"vk.com\",\"yandex.ru\"],\"version\":1}",
-  "signature": "l3tczNJypG7K3Ks2Eun0PlQV0fXtMXkTmjEdq7euzXMHooADuD2GLMl0rmocZ9CGcZ3UfgXiDu29Cwq7fcMTCA=="
+  "payload": "{\"blocked_domains\":[\"anthropic.com\",\"cdninstagram.com\",\"claude.ai\",\"discord.com\",\"discord.gg\",\"discordapp.com\",\"facebook.com\",\"fbcdn.net\",\"googlevideo.com\",\"instagram.com\",\"t.me\",\"telegram.me\",\"telegram.org\",\"telesco.pe\",\"tiktok.com\",\"tiktokcdn.com\",\"tiktokv.com\",\"twitter.com\",\"wa.me\",\"whatsapp.com\",\"whatsapp.net\",\"x.com\",\"youtu.be\",\"youtube.com\",\"ytimg.com\"],\"expires_at\":1809369058,\"format\":1,\"generated_at\":1793817058,\"ru_domains\":[\"gosuslugi.ru\",\"ozon.ru\",\"vk.com\",\"yandex.ru\"],\"version\":2}",
+  "signature": "r10lx+XBJKS7zwm0hhEZe4nKwSzYGgEBiIHBrIJVzwXfvwE5CyZdMFCTiAoZdCKjDqXF1c5DPo215+st6EScAw=="
 }
