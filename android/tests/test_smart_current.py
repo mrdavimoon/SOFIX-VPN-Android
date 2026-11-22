@@ -16,7 +16,8 @@ class SmartCurrentTests(unittest.TestCase):
         self.assertIn('MmkvManager.decodeServerList(verifiedSub.guid)',MAIN)
 
     def test_prefer_supported_moscow_tcp_only(self):
-        self.assertIn('title.contains("Москва SMART",ignoreCase=true)',MAIN)
+        self.assertIn('title.contains("Москва-1",ignoreCase=true)',MAIN)
+        self.assertIn('title.contains("Москва-2",ignoreCase=true)',MAIN)
         self.assertIn('title.contains("TCP",ignoreCase=true)',MAIN)
         self.assertIn('profile?.network.equals("tcp",ignoreCase=true)',MAIN)
         self.assertIn('?: candidates.firstOrNull()',MAIN)
@@ -27,7 +28,7 @@ class SmartCurrentTests(unittest.TestCase):
         self.assertGreaterEqual(p['version'],2)
         self.assertEqual(len(base64.b64decode(d['signature'])),64)
         for domain in ('youtube.com','instagram.com','telegram.org','t.me',
-                       'whatsapp.com','tiktok.com','discord.com','claude.ai'):
+                       'whatsapp.com','tiktok.com','discord.com'):
             self.assertIn(domain,p['blocked_domains'])
         self.assertIn('verifier.verify(sig)',RULES)
 

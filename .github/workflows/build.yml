@@ -7,7 +7,7 @@ on:
         type: string
         required: false
   push:
-    branches: [main]
+    branches: [main, feat/android-hybrid-b-20261122]
     paths:
       - 'android/**'
 

@@ -30,6 +30,14 @@ object SofixRuleUpdates {
     )
     fun blocked(c:Context):List<String> = stored(c,"blocked_domains",fallbackBlocked)
     fun ru(c:Context):List<String> = stored(c,"ru_domains",emptySet())
+    fun proxyRules(c:Context):List<String> =
+        storedV3(c,"proxy_rules",SofixHybridDefaults.proxyRules)
+    fun directRules(c:Context):List<String> =
+        storedV3(c,"direct_rules",SofixHybridDefaults.directRules)
+    fun proxyIps(c:Context):List<String> =
+        storedV3(c,"proxy_ips",SofixHybridDefaults.proxyIps)
+    fun directIps(c:Context):List<String> =
+        storedV3(c,"direct_ips",SofixHybridDefaults.directIps)
     fun version(c:Context):Int = c.getSharedPreferences(PREF,0).getInt("version",0)
     fun lastChecked(c:Context):Long = c.getSharedPreferences(PREF,0).getLong("checked",0L)
     private fun stored(c:Context,key:String,fallback:Set<String>):List<String> {
@@ -38,6 +46,42 @@ object SofixRuleUpdates {
             val arr=JSONObject(raw).getJSONArray(key)
             (0 until arr.length()).map{arr.getString(it)}.sorted()
         }catch (_:Exception){fallback.sorted()}
+    }
+    private fun storedV3(c:Context,key:String,fallback:List<String>):List<String> {
+        val raw=c.getSharedPreferences(PREF,0).getString("payload",null) ?: return fallback
+        return try {
+            val payload=JSONObject(raw)
+            if(payload.optInt("version")<3)return fallback
+            val arr=payload.getJSONArray(key)
+            (0 until arr.length()).map { arr.getString(it) }
+        }catch (_:Exception){ fallback }
+    }
+    private fun validateRouteRules(array:JSONArray):List<String> {
+        require(array.length() in 1..16000)
+        val rules=(0 until array.length()).map { array.getString(it) }
+        require(rules.distinct().size==rules.size)
+        for(rule in rules) {
+            val type=rule.substringBefore(':')
+            val host=rule.substringAfter(':',"")
+            require(type=="domain" || type=="full")
+            require(SofixRouting.canonical(host)==host)
+        }
+        return rules
+    }
+    private fun validateCidrs(array:JSONArray):List<String> {
+        require(array.length() in 1..1000)
+        val ranges=(0 until array.length()).map { array.getString(it) }
+        require(ranges.distinct().size==ranges.size)
+        for(cidr in ranges) {
+            require(cidr.length in 3..65)
+            val host=cidr.substringBefore('/')
+            require(host.contains('.') || host.contains(':'))
+            require(host.all { it in "0123456789abcdefABCDEF.:" })
+            val bits=java.net.InetAddress.getByName(host).address.size*8
+            require(cidr.indexOf('/')<0 || cidr.substringAfter('/').toIntOrNull()
+                ?.let { it in 0..bits } == true)
+        }
+        return ranges
     }
     private fun validate(array:JSONArray):List<String> {
         require(array.length()<=16000)
@@ -65,6 +109,14 @@ object SofixRuleUpdates {
         require(parsed.getLong("expires_at")>System.currentTimeMillis()/1000)
         validate(parsed.getJSONArray("blocked_domains"))
         validate(parsed.getJSONArray("ru_domains"))
+        if(parsed.getInt("version")>=3) {
+            val proxy=validateRouteRules(parsed.getJSONArray("proxy_rules"))
+            val direct=validateRouteRules(parsed.getJSONArray("direct_rules"))
+            require(proxy.size>=80)
+            require(proxy.toSet().intersect(direct.toSet()).isEmpty())
+            require(validateCidrs(parsed.getJSONArray("proxy_ips")).size>=20)
+            validateCidrs(parsed.getJSONArray("direct_ips"))
+        }
         return parsed
     }
 
