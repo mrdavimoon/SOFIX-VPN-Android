@@ -13,14 +13,14 @@ class Version08(unittest.TestCase):
             self.assertIn(attr,code)
     def test_manual_rules_before_auto(self):
         s=(ROOT/"android/SofixRouting.kt").read_text()
-        self.assertLess(s.index('for((domain,tag) in manual)'),s.index('SofixRuleUpdates.blocked(c).map'))
-        self.assertLess(s.index('SofixRuleUpdates.blocked(c).map'),s.index('geosite:category-ru'))
+        self.assertLess(s.index('for((domain,tag) in manual)'),s.index('SofixRuleUpdates.proxyRules(c)',s.index('for((domain,tag) in manual)')))
+        self.assertLess(s.index('SofixRuleUpdates.proxyRules(c)'),s.index('SofixRuleUpdates.directRules(c)'))
         self.assertNotIn('geoip:ru',s)
         self.assertIn('geoip:private',s)
     def test_selected_fallback_direct(self):
         s=(ROOT/"android/SofixRouting.kt").read_text()
-        self.assertIn('domain=listOf("regexp:.*")',s)
-        self.assertIn('ip=listOf("0.0.0.0/0","::/0")',s)
+        self.assertIn('network="tcp,udp"',s)
+        self.assertIn('mode(c)==SMART || mode(c)==SELECTED',s)
         self.assertIn('expert_confirmed',s)
     def test_routing_connected_to_xray(self):
         s=(ROOT/"android/apply_overlay.py").read_text()
@@ -54,9 +54,9 @@ class Version08(unittest.TestCase):
             self.assertNotIn(bad,demo)
         self.assertIn("versionTaps>=7",(ROOT/"android/SofixSimpleSettingsActivity.kt").read_text())
     def test_08_release_note_not_yet_release(self):
-        p=ROOT/"release-notes/v0.8.5-beta.1.md"
+        p=ROOT/"release-notes/v0.8.6-beta.1.md"
         self.assertGreater(p.stat().st_size,1000)
-        self.assertIn('versionCode = 763',(ROOT/"android/apply_overlay.py").read_text())
+        self.assertIn('versionCode = 764',(ROOT/"android/apply_overlay.py").read_text())
 
 if __name__=="__main__":
     unittest.main()

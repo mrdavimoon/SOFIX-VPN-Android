@@ -96,13 +96,19 @@
             ?: candidates.firstOrNull { guid ->
                 val profile=MmkvManager.decodeServerConfig(guid)
                 val title=profile?.remarks.orEmpty()
-                title.contains("Москва SMART",ignoreCase=true) &&
+                title.contains("Москва-1",ignoreCase=true) &&
                     title.contains("TCP",ignoreCase=true) &&
                     profile?.network.equals("tcp",ignoreCase=true)
             }
             ?: candidates.firstOrNull { guid ->
-                !MmkvManager.decodeServerConfig(guid)?.remarks.orEmpty()
-                    .contains("UDP",ignoreCase=true)
+                val profile=MmkvManager.decodeServerConfig(guid)
+                val title=profile?.remarks.orEmpty()
+                title.contains("Москва-2",ignoreCase=true) &&
+                    title.contains("TCP",ignoreCase=true) &&
+                    profile?.network.equals("tcp",ignoreCase=true)
+            }
+            ?: candidates.firstOrNull { guid ->
+                MmkvManager.decodeServerConfig(guid)?.network.equals("tcp",ignoreCase=true)
             }
             ?: candidates.firstOrNull()
             ?: throw IllegalStateException("Не удалось получить сервер VPN. Повторите проверку.")

@@ -37,7 +37,7 @@ class DefaultRoutingHotfix(unittest.TestCase):
     def test_existing_modes_still_available(self):
         for mode in ('"smart"','"all"','"selected"'):
             self.assertIn(mode,R)
-        self.assertIn('geosite:category-ru',R)
-        self.assertIn('blocked(c)',R)
+        self.assertIn('SofixRuleUpdates.proxyIps(c)',R)
+        self.assertIn('SofixRuleUpdates.proxyRules(c)',R)
 
 if __name__=="__main__":unittest.main()

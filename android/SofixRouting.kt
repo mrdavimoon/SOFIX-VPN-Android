@@ -76,16 +76,21 @@ object SofixRouting {
             .sortedWith(compareByDescending<Pair<String,String>>{it.first.length}.thenBy{it.first})
             .firstOrNull()?.let { it.second to "Личное правило: "+it.first }
     }
+    private fun matchRule(host:String, rule:String):Boolean = when {
+        rule.startsWith("full:") -> host==rule.removePrefix("full:")
+        rule.startsWith("domain:") -> match(host,rule.removePrefix("domain:"))
+        else -> false
+    }
     fun explain(c:Context, text:String):Pair<String,String> {
         val host=canonical(text)
         mostSpecific(host,entries(c,false),entries(c,true))?.let {return it}
         if(mode(c)==ALL)return "proxy" to "Весь интернет через VPN"
         if(mode(c)==SELECTED)return "direct" to "Выбраны только отдельные сайты"
-        val blocked=SofixRuleUpdates.blocked(c)
-        if(blocked.any{match(host,it)})return "proxy" to "Список ограниченных ресурсов"
-        if(host.endsWith(".ru") || host.endsWith(".xn--p1ai") || SofixRuleUpdates.ru(c).any{match(host,it)})
-            return "direct" to "Российский шаблон"
-        return "proxy" to "Неизвестный адрес — через VPN"
+        if(SofixRuleUpdates.proxyRules(c).any{matchRule(host,it)})
+            return "proxy" to "Ограниченный ресурс SOFIX"
+        if(SofixRuleUpdates.directRules(c).any{matchRule(host,it)})
+            return "direct" to "Прямой выход с IP телефона"
+        return "direct" to "Не ограничен — напрямую с IP телефона"
     }
 
     /**
@@ -154,6 +159,10 @@ object SofixRouting {
             if(domains.isNotEmpty())rules.add(V2rayConfig.RoutingBean.RulesBean(
                 domain=domains, outboundTag=tag))
         }
+        fun addIp(tag:String,ips:List<String>) {
+            if(ips.isNotEmpty())rules.add(V2rayConfig.RoutingBean.RulesBean(
+                ip=ips, outboundTag=tag))
+        }
         // LAN is internal and never forwarded by proxy routing.
         rules.add(V2rayConfig.RoutingBean.RulesBean(
             ip=listOf("geoip:private"),outboundTag=AppConfig.TAG_DIRECT))
@@ -163,9 +172,22 @@ object SofixRouting {
             .sortedWith(compareByDescending<Pair<String,String>>{it.first.length}.thenBy{it.first})
         for((domain,tag) in manual)add(tag,listOf("full:$domain","domain:$domain"))
         if(mode(c)==SMART) {
-            add(AppConfig.TAG_PROXY,SofixRuleUpdates.blocked(c).map{"domain:$it"})
-            add(AppConfig.TAG_DIRECT,listOf("regexp:.*\\.(ru|xn--p1ai)$","geosite:category-ru")+
-                SofixRuleUpdates.ru(c).map{"domain:$it"})
+            // Follow the same approved Hybrid B policy as Happ (GlobalProxy=false):
+            // only the explicit restricted domain and CIDR lists use the VPN.
+            add(AppConfig.TAG_PROXY,SofixRuleUpdates.proxyRules(c))
+            add(AppConfig.TAG_DIRECT,SofixRuleUpdates.directRules(c))
+            addIp(AppConfig.TAG_PROXY,SofixRuleUpdates.proxyIps(c))
+            addIp(AppConfig.TAG_DIRECT,SofixRuleUpdates.directIps(c))
+            // Mobile applications often connect to resolved IPs. Recover HTTP/TLS
+            // hostnames before comparing routes, including on the TUN inbound.
+            config.inbounds.filter { it.tag=="tun" || it.protocol=="socks" }.forEach {
+                it.sniffing?.enabled=true
+                it.sniffing?.routeOnly=false
+                it.sniffing?.destOverride?.let { values ->
+                    if("http" !in values) values.add("http")
+                    if("tls" !in values) values.add("tls")
+                }
+            }
         }
         // First insert high-priority domain/IP rules; they do not match dns-out
         // inbounds by themselves. Existing Xray DNS rules must remain intact.
@@ -173,15 +195,14 @@ object SofixRouting {
             it.outboundTag=="dns-out" && it.port=="53"
         }.size
         config.routing.rules.addAll(dnsCount,rules)
-        // For "selected" we must default to direct only AFTER all DNS routes.
-        if(mode(c)==SELECTED) {
+        // Must be *after* every pre-existing DNS rule; otherwise wildcard DIRECT
+        // would silently break the DNS interception on Android VPN TUN.
+        if(mode(c)==SMART || mode(c)==SELECTED) {
             config.routing.rules.add(V2rayConfig.RoutingBean.RulesBean(
-                domain=listOf("regexp:.*"),outboundTag=AppConfig.TAG_DIRECT))
-            config.routing.rules.add(V2rayConfig.RoutingBean.RulesBean(
-                ip=listOf("0.0.0.0/0","::/0"),outboundTag=AppConfig.TAG_DIRECT))
+                network="tcp,udp",outboundTag=AppConfig.TAG_DIRECT))
         }
-        // Xray default outbound is proxy in other modes.
-        config.routing.domainStrategy="AsIs"
+        // Mirror Happ IPIfNonMatch: IP-only clients are matched against CIDRs.
+        config.routing.domainStrategy=if(mode(c)==SMART)"IPIfNonMatch" else "AsIs"
         return true
     }
 }

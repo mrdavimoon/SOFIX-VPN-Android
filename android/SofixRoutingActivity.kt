@@ -80,11 +80,11 @@ class SofixRoutingActivity:ComponentActivity() {
                 Spacer(Modifier.height(9.dp))
                 listOf(
                     Triple("smart","Умный · рекомендуется",
-                        "Российские сайты напрямую, ограниченные и неизвестные — через VPN"),
+                        "Российские и обычные сайты — с IP телефона; ограниченные — через VPN"),
                     Triple("all","Весь интернет через VPN",
-                        "Публичные подключения через SOFIX, кроме явных исключений"),
+                        "Всё через SOFIX, кроме локальной сети и ваших исключений"),
                     Triple("selected","Только выбранные сайты",
-                        "Напрямую всё, кроме списка «Всегда через VPN»")
+                        "Все сайты напрямую, кроме вашего списка VPN")
                 ).forEach { (id,title,desc) ->
                     Row(Modifier.fillMaxWidth().padding(bottom=9.dp)
                         .background(card,RoundedCornerShape(15.dp))
